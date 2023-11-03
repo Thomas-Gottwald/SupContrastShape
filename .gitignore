@@ -1,3 +1,5 @@
+datasets/
+
 tmp*.py
 .idea/
 
