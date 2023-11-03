@@ -6,7 +6,7 @@ import argparse
 import time
 import math
 
-import tensorboard_logger as tb_logger
+from torch.utils.tensorboard import SummaryWriter
 import torch
 import torch.backends.cudnn as cudnn
 from torchvision import transforms, datasets
@@ -15,12 +15,6 @@ from util import AverageMeter
 from util import adjust_learning_rate, warmup_learning_rate, accuracy
 from util import set_optimizer, save_model
 from networks.resnet_big import SupCEResNet
-
-try:
-    import apex
-    from apex import amp, optimizers
-except ImportError:
-    pass
 
 
 def parse_option():
@@ -171,9 +165,6 @@ def set_model(opt):
     model = SupCEResNet(name=opt.model, num_classes=opt.n_cls)
     criterion = torch.nn.CrossEntropyLoss()
 
-    # enable synchronized Batch Normalization
-    if opt.syncBN:
-        model = apex.parallel.convert_syncbn_model(model)
 
     if torch.cuda.is_available():
         if torch.cuda.device_count() > 1:
@@ -291,7 +282,7 @@ def main():
     optimizer = set_optimizer(opt, model)
 
     # tensorboard
-    logger = tb_logger.Logger(logdir=opt.tb_folder, flush_secs=2)
+    writer = SummaryWriter(log_dir=opt.tb_folder, flush_secs=2)
 
     # training routine
     for epoch in range(1, opt.epochs + 1):
@@ -304,14 +295,14 @@ def main():
         print('epoch {}, total time {:.2f}'.format(epoch, time2 - time1))
 
         # tensorboard logger
-        logger.log_value('train_loss', loss, epoch)
-        logger.log_value('train_acc', train_acc, epoch)
-        logger.log_value('learning_rate', optimizer.param_groups[0]['lr'], epoch)
+        writer.add_scalar('train_loss', loss, epoch)
+        writer.add_scalar('train_acc', train_acc, epoch)
+        writer.add_scalar('learning_rate', optimizer.param_groups[0]['lr'], epoch)
 
         # evaluation
         loss, val_acc = validate(val_loader, model, criterion, opt)
-        logger.log_value('val_loss', loss, epoch)
-        logger.log_value('val_acc', val_acc, epoch)
+        writer.add_scalar('val_loss', loss, epoch)
+        writer.add_scalar('val_acc', val_acc, epoch)
 
         if val_acc > best_acc:
             best_acc = val_acc
@@ -320,6 +311,9 @@ def main():
             save_file = os.path.join(
                 opt.save_folder, 'ckpt_epoch_{epoch}.pth'.format(epoch=epoch))
             save_model(model, optimizer, opt, epoch, save_file)
+
+    # tensorboard
+    writer.close()
 
     # save the last model
     save_file = os.path.join(
