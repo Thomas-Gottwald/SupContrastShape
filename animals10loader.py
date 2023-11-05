@@ -1,48 +1,51 @@
 import os
-import glob
-import torch
+import pickle
+import numpy as np
 import pandas as pd
 from torch.utils.data import Dataset
-from skimage import io
+
+from tqdm import tqdm
 
 
 class animals10Dataset(Dataset):
-    def __init__(self, path="./datasets/animals10/"):
-        self.path = path
-        self.df_translate = pd.read_csv(path + "translate.csv")
-        self.df_animals10 = pd.read_csv(path + "animals10.csv")
+    def __init__(self, root="./datasets/animals10_160to300/", transform=None):
+        self.root = root
+        self.df_translate = pd.read_csv(root + "translate.csv")
+        self.df_animals10 = pd.read_csv(root + "animals10_160to300.csv")
+        self.transform = transform
+
+        self.classes = self.df_translate.columns.to_list()
+
+        self.data = []
+        self.targets = []
+
+        # load the picked data
+        for c in tqdm(self.classes):
+            file_path = os.path.join(root, f"{c}")
+            with open(file_path, 'rb') as f:
+                entry = pickle.load(f, encoding='latin1')
+                self.data.append(entry['data'])
+                self.targets.extend(entry['labels'])
+
+        self.data = np.vstack(self.data).reshape(-1, 3, 300, 300)
+        self.data = self.data.transpose((0, 2, 3, 1))# to HWC
 
     def __len__(self):
-        return len(self.df_animals10)
+        return len(self.data)
 
-    def __getitem__(self, idx):
-        if torch.is_tensor(idx):
-            idx = idx.tolist()
+    def __getitem__(self, index):
 
-        img_loc = os.path.join(self.path, self.df_animals10.iloc[idx,0])
+        image, label = self.data[index], self.targets[index]
 
-        image = torch.Tensor(io.imread(img_loc)/255.0)
-        label = self.df_animals10.iloc[idx,1]
+        if self.transform is not None:
+            image = self.transform(image)
 
         return image, label
 
-
-def create_csv_files(path="./datasets/animals10/"):
-    df_translate = pd.DataFrame.from_dict(
-        {"cane": ["dog"], "cavallo": ["horse"], "elefante": ["elephant"], "farfalla": ["butterfly"], "gallina": ["chicken"],
-        "gatto": ["cat"], "mucca": ["cow"], "pecora": ["sheep"], "ragno": ["spider"], "scoiattolo": ["squirrel"]})
-
-    images = []
-    labels = []
-    for i, c in enumerate(df_translate):
-        img_paths = glob.glob(path + f"raw-img/{c}/*")
-
-        for img_path in img_paths:
-            img = img_path.replace(path, '').replace('\\', '/')
-            images.append(img)
-            labels.append(i)
-
-    df_animals10 = pd.DataFrame.from_dict({'image': images, 'label': labels})
-
-    df_translate.to_csv(path_or_buf = path + "translate.csv", index=False)
-    df_animals10.to_csv(path_or_buf = path + "animals10.csv", index=False)
+    @property
+    def class_to_idx(self):
+        class_to_idx = dict()
+        for i, c in enumerate(self.classes):
+            class_to_idx[c] = i
+        return class_to_idx
+    
