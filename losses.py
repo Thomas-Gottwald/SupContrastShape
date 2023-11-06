@@ -1,6 +1,10 @@
 """
 Author: Yonglong Tian (yonglong@mit.edu)
 Date: May 07, 2020
+
+("hybrid-mode")
+Coauthor: Thomas Gottwald
+Date: November 06, 2023
 """
 from __future__ import print_function
 
@@ -18,7 +22,7 @@ class SupConLoss(nn.Module):
         self.contrast_mode = contrast_mode
         self.base_temperature = base_temperature
 
-    def forward(self, features, labels=None, mask=None):
+    def forward(self, features, labels=None, mask=None, hybrid:bool=False):
         """Compute loss for model. If both `labels` and `mask` are None,
         it degenerates to SimCLR unsupervised loss:
         https://arxiv.org/pdf/2002.05709.pdf
@@ -28,6 +32,9 @@ class SupConLoss(nn.Module):
             labels: ground truth of shape [bsz].
             mask: contrastive mask of shape [bsz, bsz], mask_{i,j}=1 if sample j
                 has the same class as sample i. Can be asymmetric.
+            hybrid: if True use label information only for negatives and
+                use the related feature vector as positive
+                (only works if labels are given)
         Returns:
             A loss scalar.
         """
@@ -84,6 +91,14 @@ class SupConLoss(nn.Module):
             0
         )
         mask = mask * logits_mask
+
+        if hybrid and labels is not None:
+            # negative_mask for all features vectors with different labels
+            negative_mask = (torch.ones_like(mask)-mask) * logits_mask
+            # mask for the related feature vectors (use as positives)
+            mask = torch.eye(batch_size, dtype=torch.float32).to(device).repeat(anchor_count, contrast_count) * logits_mask
+            # logits_mask for used positives and negatives combined
+            logits_mask = mask + negative_mask
 
         # compute log_prob
         exp_logits = torch.exp(logits) * logits_mask
