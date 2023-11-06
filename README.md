@@ -1,4 +1,11 @@
 # SupContrast: Supervised Contrastive Learning
+
+**Supervised Contrastive Learning with animals10**  
+Pretraining stage:
+```
+python main_supcon.py --dataset animals10 --batch_size 1024 --learning_rate 0.5 --temp 0.1 --cosine
+```
+
 <p align="center">
   <img src="figures/teaser.png" width="700">
 </p>

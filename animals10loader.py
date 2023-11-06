@@ -2,16 +2,17 @@ import os
 import pickle
 import numpy as np
 import pandas as pd
+from PIL import Image
 from torch.utils.data import Dataset
 
 from tqdm import tqdm
 
 
 class animals10Dataset(Dataset):
-    def __init__(self, root="./datasets/animals10_160to300/", transform=None):
+    def __init__(self, root="./datasets/", transform=None):
         self.root = root
-        self.df_translate = pd.read_csv(root + "translate.csv")
-        self.df_animals10 = pd.read_csv(root + "animals10_160to300.csv")
+        self.df_translate = pd.read_csv(root + "animals10_160to300/translate.csv")
+        self.df_animals10 = pd.read_csv(root + "animals10_160to300/animals10.csv")
         self.transform = transform
 
         self.classes = self.df_translate.columns.to_list()
@@ -21,14 +22,14 @@ class animals10Dataset(Dataset):
 
         # load the picked data
         for c in tqdm(self.classes):
-            file_path = os.path.join(root, f"{c}")
+            file_path = os.path.join(root, f"animals10_160to300/{c}")
             with open(file_path, 'rb') as f:
                 entry = pickle.load(f, encoding='latin1')
                 self.data.append(entry['data'])
                 self.targets.extend(entry['labels'])
 
-        self.data = np.vstack(self.data).reshape(-1, 3, 300, 300)
-        self.data = self.data.transpose((0, 2, 3, 1))# to HWC
+        # to HWC
+        self.data = np.vstack(self.data).reshape(-1, 300, 300, 3)
 
     def __len__(self):
         return len(self.data)
@@ -36,6 +37,9 @@ class animals10Dataset(Dataset):
     def __getitem__(self, index):
 
         image, label = self.data[index], self.targets[index]
+
+        # PIL Image
+        image = Image.fromarray(image)
 
         if self.transform is not None:
             image = self.transform(image)
