@@ -30,7 +30,7 @@ def set_loader():
     
     train_sampler = None
     train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=8, shuffle=(train_sampler is None),
+        train_dataset, batch_size=16, shuffle=(train_sampler is None),
         num_workers=4, pin_memory=True, sampler=train_sampler)
 
     return train_loader
@@ -38,28 +38,32 @@ def set_loader():
 
 def main():
 
-    cuda_device = 0
+    # cuda_device = 1
 
     # build data loader
     train_loader = set_loader()
 
     print("create model")
-    model = SupConResNet(name="resnet50")
+    model = SupConResNet(name="resnet18")
     criterion = SupConLoss(temperature=0.1)
 
     if torch.cuda.is_available():
         print("put model on GPU")
-        model.cuda(device=cuda_device)
+        # model.cuda(device=cuda_device)
+        model.cuda()
         print("model on GPU")
-        criterion = criterion.cuda(device=cuda_device)
+        # criterion = criterion.cuda(device=cuda_device)
+        criterion = criterion.cuda()
         cudnn.benchmark = True
 
     
     for idx, (images, labels) in enumerate(train_loader):
         images = torch.cat([images[0], images[1]], dim=0)
         if torch.cuda.is_available():
-            images = images.cuda(device=cuda_device, non_blocking=True)
-            labels = labels.cuda(device=cuda_device, non_blocking=True)
+            # images = images.cuda(device=cuda_device, non_blocking=True)
+            # labels = labels.cuda(device=cuda_device, non_blocking=True)
+            images = images.cuda(non_blocking=True)
+            labels = labels.cuda(non_blocking=True)
         bsz = labels.shape[0]
         print(f"bsz={bsz}, images.shape={images.shape}, labels.shape={labels.shape}")
 
