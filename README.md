@@ -4,24 +4,31 @@
 
 Tensorboard:
 ```
-tensorboard --logdir=./save/SupCon/cifar10_tensorboard/SupCon_cifar10_resnet50_lr_0.5_decay_0.0001_bsz_512_temp_0.1_trial_0_cosine_warm
+tensorboard --logdir=./save/SupCon/cifar10_tensorboard/SupCon_cifar10_resnet50_lr_0.5_decay_0.0001_bsz_400_temp_0.1_trial_0_cosine_warm
 ```
 
 Pretraining stage:
 ```
-CUDA_VISIBLE_DEVICES=1 nohup python main_supcon.py --dataset cifar10 --method SupCon --batch_size 512 --learning_rate 0.5 --temp 0.1 --cosine --epochs 300
+CUDA_VISIBLE_DEVICES=1 nohup python main_supcon.py --dataset cifar10 --method SupCon --batch_size 400 --learning_rate 0.5 --temp 0.1 --cosine --epochs 300
 ```
 
-**Supervised Contrastive Learning with animals10**
+Classifier training stage:
+```
+CUDA_VISIBLE_DEVICES=1 nohup python main_linear.py --batch_size 256 --learning_rate 5 --ckpt ./save/SupCon/cifar10_models/SupCon_cifar10_resnet50_lr_0.5_decay_0.0001_bsz_400_temp_0.1_trial_0_cosine_warm/ckpt_epoch_300.pth --epochs 100
+```
+
+**Supervised Contrastive Learning with animals10_300x300**
 Tensorboard:
 ```
-tensorboard --logdir=./save/SupCon/animals10_tensorboard/SupCon_hybrid_animals10_resnet50_lr_0.5_decay_0.0001_bsz_1024_temp_0.1_trial_0_cosine_warm
+tensorboard --logdir=./save/SupCon/path_tensorboard/SupCon_path_resnet18_lr_0.5_decay_0.0001_bsz_16_temp_0.1_trial_0_cosine_warm
 ```
 
 Pretraining stage:
 ```
-python main_supcon.py --dataset animals10 --method SupCon_hybrid --batch_size 1024 --learning_rate 0.5 --temp 0.1 --cosine --epochs 200
+CUDA_VISIBLE_DEVICES=1 nohup python main_supcon.py --dataset path --data_folder ./datasets/animals10_300x300/train/ --learning_rate 0.5 --temp 0.1 --cosine --model resnet18 --epochs 300 --batch_size 16 --method SupCo --mean "(, , )" --std "(, , )"
 ```
+
+
 
 Classifier training stage:
 ```
