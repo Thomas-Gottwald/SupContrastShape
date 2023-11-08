@@ -5,7 +5,6 @@ from torchvision import transforms, datasets
 from util import TwoCropTransform
 from networks.resnet_big import SupConResNet
 from losses import SupConLoss
-from animals10loader import animals10Dataset
 
 
 def set_loader(dataset='animals10'):
@@ -16,8 +15,8 @@ def set_loader(dataset='animals10'):
         size = 32
         batchsize = 512
     else:
-        # for animasl10 160to300
-        mean = (0.3890, 0.3757, 0.3122)
+        # for animasl10_300x300
+        mean = (0.3890, 0.3757, 0.3122)# TODO update mean and std for animasl10_300x300
         std = (0.3279, 0.3201, 0.3073)
         size = 300
         batchsize = 16
@@ -39,7 +38,8 @@ def set_loader(dataset='animals10'):
                                          transform=TwoCropTransform(train_transform),
                                          download=True)
     else:
-        train_dataset = animals10Dataset(transform=TwoCropTransform(train_transform))
+        train_dataset = datasets.ImageFolder(root="./datasets/animals10_300x300/train/",
+                                             transform=TwoCropTransform(train_transform))
     
     train_sampler = None
     train_loader = torch.utils.data.DataLoader(
@@ -51,10 +51,10 @@ def set_loader(dataset='animals10'):
 
 def main():
 
-    # cuda_device = 1
+    cuda_device = 1
 
     # build data loader
-    train_loader = set_loader(dataset='cifar10')
+    train_loader = set_loader(dataset='animals10')
 
     print("create model")
     model = SupConResNet(name="resnet18")
@@ -62,21 +62,17 @@ def main():
 
     if torch.cuda.is_available():
         print("put model on GPU")
-        # model.cuda(device=cuda_device)
-        model.cuda()
+        model.cuda(device=cuda_device)
         print("model on GPU")
-        # criterion = criterion.cuda(device=cuda_device)
-        criterion = criterion.cuda()
+        criterion = criterion.cuda(device=cuda_device)
         cudnn.benchmark = True
 
     
     for idx, (images, labels) in enumerate(train_loader):
         images = torch.cat([images[0], images[1]], dim=0)
         if torch.cuda.is_available():
-            # images = images.cuda(device=cuda_device, non_blocking=True)
-            # labels = labels.cuda(device=cuda_device, non_blocking=True)
-            images = images.cuda(non_blocking=True)
-            labels = labels.cuda(non_blocking=True)
+            images = images.cuda(device=cuda_device, non_blocking=True)
+            labels = labels.cuda(device=cuda_device, non_blocking=True)
         bsz = labels.shape[0]
         print(f"bsz={bsz}, images.shape={images.shape}, labels.shape={labels.shape}")
 
