@@ -25,7 +25,7 @@ tensorboard --logdir=./save/SupCon/path_tensorboard/SupCon_path_resnet18_lr_0.5_
 
 Pretraining stage:
 ```
-CUDA_VISIBLE_DEVICES=1 nohup python main_supcon.py --dataset path --data_folder ./datasets/animals10_300x300/train/ --learning_rate 0.5 --temp 0.1 --cosine --model resnet18 --epochs 300 --batch_size 16 --method SupCo --mean "(, , )" --std "(, , )"
+CUDA_VISIBLE_DEVICES=1 nohup python main_supcon.py --dataset path --data_folder ./datasets/animals10_300x300/train/ --learning_rate 0.5 --temp 0.1 --cosine --model resnet18 --epochs 300 --batch_size 16 --method SupCo --mean "(0.3837, 0.3704, 0.3072)" --std "(0.3268, 0.3187, 0.3051)"
 ```
 
 
