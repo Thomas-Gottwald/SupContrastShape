@@ -28,6 +28,10 @@ def parse_option():
                         help='batch_size')
     parser.add_argument('--num_workers', type=int, default=16,
                         help='num of workers to use')
+    parser.add_argument('--batch_size_val', type=int, default=256,
+                        help='batch_size for validation')
+    parser.add_argument('--num_workers_val', type=int, default=8,
+                        help='num of workers to use for validation')
     parser.add_argument('--epochs', type=int, default=500,
                         help='number of training epochs')
 
@@ -46,7 +50,13 @@ def parse_option():
     # model dataset
     parser.add_argument('--model', type=str, default='resnet50')
     parser.add_argument('--dataset', type=str, default='cifar10',
-                        choices=['cifar10', 'cifar100'], help='dataset')
+                        choices=['cifar10', 'cifar100', 'path'], help='dataset')
+    parser.add_argument('--mean', type=str, help='mean of dataset in path in form of str tuple')
+    parser.add_argument('--std', type=str, help='std of dataset in path in form of str tuple')
+    parser.add_argument('--data_folder', type=str, default=None, help='path to custom dataset training data')
+    parser.add_argument('--test_folder', type=str, default=None, help='path to custom dataset validation data')
+    parser.add_argument('--size', type=int, default=32, help='parameter for RandomResizedCrop')
+    parser.add_argument('--num_classes', type=int, default=None, help='number of classes in the custom dataset')
 
     # other setting
     parser.add_argument('--cosine', action='store_true',
@@ -60,8 +70,17 @@ def parse_option():
 
     opt = parser.parse_args()
 
+    # check if dataset is path that passed required arguments
+    if opt.dataset == 'path':
+        assert opt.data_folder is not None \
+            and opt.test_folder is not None \
+            and opt.mean is not None \
+            and opt.std is not None \
+            and opt.num_classes is not None
+
     # set the path according to the environment
-    opt.data_folder = './datasets/'
+    if opt.data_folder is None:
+        opt.data_folder = './datasets/'
     opt.model_path = './save/SupCon/{}_models'.format(opt.dataset)
     opt.tb_path = './save/SupCon/{}_tensorboard'.format(opt.dataset)
 
@@ -103,6 +122,8 @@ def parse_option():
         opt.n_cls = 10
     elif opt.dataset == 'cifar100':
         opt.n_cls = 100
+    elif opt.dataset == 'path':
+        opt.n_cls = opt.num_classes
     else:
         raise ValueError('dataset not supported: {}'.format(opt.dataset))
 
@@ -117,12 +138,15 @@ def set_loader(opt):
     elif opt.dataset == 'cifar100':
         mean = (0.5071, 0.4867, 0.4408)
         std = (0.2675, 0.2565, 0.2761)
+    elif opt.dataset == 'path':
+        mean = eval(opt.mean)
+        std = eval(opt.std)
     else:
         raise ValueError('dataset not supported: {}'.format(opt.dataset))
     normalize = transforms.Normalize(mean=mean, std=std)
 
     train_transform = transforms.Compose([
-        transforms.RandomResizedCrop(size=32, scale=(0.2, 1.)),
+        transforms.RandomResizedCrop(size=opt.size, scale=(0.2, 1.)),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         normalize,
@@ -147,6 +171,12 @@ def set_loader(opt):
         val_dataset = datasets.CIFAR100(root=opt.data_folder,
                                         train=False,
                                         transform=val_transform)
+    elif opt.dataset == 'path':
+        train_dataset = datasets.ImageFolder(root=opt.data_folder,
+                                            transform=train_transform)
+        
+        val_dataset = datasets.ImageFolder(root=opt.test_folder,
+                                            transform=val_transform)
     else:
         raise ValueError(opt.dataset)
 
@@ -155,8 +185,8 @@ def set_loader(opt):
         train_dataset, batch_size=opt.batch_size, shuffle=(train_sampler is None),
         num_workers=opt.num_workers, pin_memory=True, sampler=train_sampler)
     val_loader = torch.utils.data.DataLoader(
-        val_dataset, batch_size=256, shuffle=False,
-        num_workers=8, pin_memory=True)
+        val_dataset, batch_size=opt.batch_size_val, shuffle=False,
+        num_workers=opt.num_workers_val, pin_memory=True)
 
     return train_loader, val_loader
 
