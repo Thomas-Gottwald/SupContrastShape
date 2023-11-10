@@ -1,6 +1,8 @@
 # SupContrast: Supervised Contrastive Learning
 
-**Supervised Contrastive Learning with cifar10**
+## Supervised Contrastive Learning with cifar10
+
+**Resnet50, batchsize: 400, epochs: 300**
 
 Tensorboard:
 ```
@@ -17,23 +19,37 @@ Classifier training stage:
 CUDA_VISIBLE_DEVICES=1 nohup python main_linear.py --batch_size 256 --learning_rate 5 --ckpt ./save/SupCon/cifar10_models/SupCon_cifar10_resnet50_lr_0.5_decay_0.0001_bsz_400_temp_0.1_trial_0_cosine_warm/ckpt_epoch_300.pth --epochs 100
 ```
 
-**Supervised Contrastive Learning with animals10_300x300**
+## Supervised Contrastive Learning with animals10_300x300
+
+**Resnet18, batchsize: 16, epochs: 300**
+
 Tensorboard:
 ```
-tensorboard --logdir=./save/SupCon/path_tensorboard/SupCon_path_resnet18_lr_0.5_decay_0.0001_bsz_16_temp_0.1_trial_0_cosine_warm
+tensorboard --logdir=./save/SupCon/path_tensorboard/SupCon_path_resnet18_lr_0.5_decay_0.0001_bsz_16_temp_0.1_trial_0_cosine
 ```
 
 Pretraining stage:
 ```
-CUDA_VISIBLE_DEVICES=1 nohup python main_supcon.py --dataset path --data_folder ./datasets/animals10_300x300/train/ --learning_rate 0.5 --temp 0.1 --cosine --model resnet18 --epochs 300 --batch_size 16 --method SupCo --mean "(0.3837, 0.3704, 0.3072)" --std "(0.3268, 0.3187, 0.3051)"
+CUDA_VISIBLE_DEVICES=1 nohup python main_supcon.py --dataset path --data_folder ./datasets/animals10_300x300/train/ --learning_rate 0.5 --temp 0.1 --cosine --model resnet18 --epochs 300 --batch_size 16 --method SupCon --mean "(0.3837, 0.3704, 0.3072)" --std "(0.3268, 0.3187, 0.3051)"
 ```
-
-
 
 Classifier training stage:
 ```
 python main_linear.py --batch_size 512 --learning_rate 1 --ckpt /path/to/model.pth
 ```
+
+**Resnet34, batchsize: 30, epochs: 1000**
+
+Tensorboard:
+```
+tensorboard --logdir=./save/SupCon/path_tensorboard/SupCon_path_resnet34_lr_0.5_decay_0.0001_bsz_30_temp_0.1_trial_0_cosine
+```
+
+Pretraining stage:
+```
+CUDA_VISIBLE_DEVICES=1,2 nohup python main_supcon.py --dataset path --data_folder ./datasets/animals10_300x300/train/ --learning_rate 0.5 --temp 0.1 --cosine --model resnet34 --epochs 1000 --batch_size 30 --method SupCon --mean "(0.3837, 0.3704, 0.3072)" --std "(0.3268, 0.3187, 0.3051)" > supCon.out &
+```
+
 
 <p align="center">
   <img src="figures/teaser.png" width="700">

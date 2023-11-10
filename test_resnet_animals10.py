@@ -1,3 +1,4 @@
+# CUDA_VISIBLE_DEVICES=1,2 python test_resnet_animals10.py
 import torch
 import torch.backends.cudnn as cudnn
 from torchvision import transforms, datasets
@@ -16,10 +17,13 @@ def set_loader(dataset='animals10'):
         batchsize = 512
     else:
         # for animasl10_300x300
-        mean = (0.3890, 0.3757, 0.3122)# TODO update mean and std for animasl10_300x300
-        std = (0.3279, 0.3201, 0.3073)
+        mean = (0.3837, 0.3704, 0.3072)
+        std = (0.3268, 0.3187, 0.3051)
         size = 300
-        batchsize = 16
+        # one GPU: resnet18 batchsize=16 (26)
+        # two GPUs: resnet18 batchsize=52
+        # two GPUs: resnet34 batchsize=30
+        batchsize = 30
     normalize = transforms.Normalize(mean=mean, std=std)
 
     train_transform = transforms.Compose([
@@ -51,8 +55,6 @@ def set_loader(dataset='animals10'):
 
 def main():
 
-    cuda_device = 1
-
     # build data loader
     train_loader = set_loader(dataset='animals10')
 
@@ -62,17 +64,20 @@ def main():
 
     if torch.cuda.is_available():
         print("put model on GPU")
-        model.cuda(device=cuda_device)
+        if torch.cuda.device_count() > 1:
+            print("multiple GPUs detected")
+            model.encoder = torch.nn.DataParallel(model.encoder)
+        model.cuda()
         print("model on GPU")
-        criterion = criterion.cuda(device=cuda_device)
+        criterion = criterion.cuda()
         cudnn.benchmark = True
 
     
     for idx, (images, labels) in enumerate(train_loader):
         images = torch.cat([images[0], images[1]], dim=0)
         if torch.cuda.is_available():
-            images = images.cuda(device=cuda_device, non_blocking=True)
-            labels = labels.cuda(device=cuda_device, non_blocking=True)
+            images = images.cuda(non_blocking=True)
+            labels = labels.cuda(non_blocking=True)
         bsz = labels.shape[0]
         print(f"bsz={bsz}, images.shape={images.shape}, labels.shape={labels.shape}")
 
