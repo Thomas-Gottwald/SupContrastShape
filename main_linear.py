@@ -14,6 +14,7 @@ from main_ce import set_loader
 from util import AverageMeter
 from util import adjust_learning_rate, warmup_learning_rate, accuracy
 from util import set_optimizer, save_model
+from util_pre_com_feat import set_feature_loader, IdentityWrapperNet
 from networks.resnet_big import SupConResNet, LinearClassifier
 
 
@@ -66,16 +67,27 @@ def parse_option():
 
     parser.add_argument('--ckpt', type=str, default='',
                         help='path to pre-trained model')
+    parser.add_argument('--pre_comp_feat', action='store_true',
+                        help='Use pre computed feature embedding')
 
     opt = parser.parse_args()
 
-    # check if dataset is path that passed required arguments
-    if opt.dataset == 'path':
+    # check if flag pre_comp_feat is set or dataset is path
+    # that passed required arguments
+    if opt.pre_comp_feat:
+        assert opt.data_folder is not None \
+            and opt.test_folder is not None
+        if opt.dataset == 'path':
+            assert opt.num_classes is not None
+    elif opt.dataset == 'path':
         assert opt.data_folder is not None \
             and opt.test_folder is not None \
             and opt.mean is not None \
             and opt.std is not None \
             and opt.num_classes is not None
+    # check if GPU is available when no precomputed feature embedding is given
+    if not opt.pre_comp_feat and not torch.cuda.is_available():
+        raise NotImplementedError('This code requires GPU without precomputed feature embedding')
 
     # set the path according to the environment
     if opt.data_folder is None:
@@ -107,6 +119,9 @@ def parse_option():
         else:
             opt.warmup_to = opt.learning_rate
 
+    if opt.pre_comp_feat:
+        opt.model_name = '{}_pre_comp_feat'.format(opt.model_name)
+
     opt.tb_folder = os.path.join(opt.tb_path, opt.model_name)
     if not os.path.isdir(opt.tb_folder):
         os.makedirs(opt.tb_folder)
@@ -128,18 +143,23 @@ def parse_option():
 
 
 def set_model(opt):
-    model = SupConResNet(name=opt.model)
+    # for precomputed feature embedding use a dummy model witch acts as the identity
+    if opt.pre_comp_feat:
+        model = IdentityWrapperNet()
+    else:
+        model = SupConResNet(name=opt.model)
     criterion = torch.nn.CrossEntropyLoss()
 
     classifier = LinearClassifier(name=opt.model, num_classes=opt.n_cls)
-
-    ckpt = torch.load(opt.ckpt, map_location='cpu')
-    state_dict = ckpt['model']
+    
+    if not opt.pre_comp_feat:
+        ckpt = torch.load(opt.ckpt, map_location='cpu')
+        state_dict = ckpt['model']
 
     if torch.cuda.is_available():
         if torch.cuda.device_count() > 1:
             model.encoder = torch.nn.DataParallel(model.encoder)
-        else:
+        elif not opt.pre_comp_feat:
             new_state_dict = {}
             for k, v in state_dict.items():
                 k = k.replace("module.", "")
@@ -150,9 +170,10 @@ def set_model(opt):
         criterion = criterion.cuda()
         cudnn.benchmark = True
 
-        model.load_state_dict(state_dict)
-    else:
-        raise NotImplementedError('This code requires GPU')
+        if not opt.pre_comp_feat:
+            model.load_state_dict(state_dict)
+    # else:
+    #     raise NotImplementedError('This code requires GPU')
 
     return model, classifier, criterion
 
@@ -171,8 +192,9 @@ def train(train_loader, model, classifier, criterion, optimizer, epoch, opt):
     for idx, (images, labels) in enumerate(train_loader):
         data_time.update(time.time() - end)
 
-        images = images.cuda(non_blocking=True)
-        labels = labels.cuda(non_blocking=True)
+        if torch.cuda.is_available():
+            images = images.cuda(non_blocking=True)
+            labels = labels.cuda(non_blocking=True)
         bsz = labels.shape[0]
 
         # warm-up learning rate
@@ -225,8 +247,9 @@ def validate(val_loader, model, classifier, criterion, opt):
     with torch.no_grad():
         end = time.time()
         for idx, (images, labels) in enumerate(val_loader):
-            images = images.float().cuda()
-            labels = labels.cuda()
+            if torch.cuda.is_available():
+                images = images.float().cuda()
+                labels = labels.cuda()
             bsz = labels.shape[0]
 
             # forward
@@ -262,7 +285,10 @@ def main():
     opt = parse_option()
 
     # build data loader
-    train_loader, val_loader = set_loader(opt)
+    if opt.pre_comp_feat:
+        train_loader, val_loader = set_feature_loader(opt)
+    else:
+        train_loader, val_loader = set_loader(opt)
 
     # build model and criterion
     model, classifier, criterion = set_model(opt)
