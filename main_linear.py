@@ -1,17 +1,19 @@
 from __future__ import print_function
 
+import os
 import sys
 import argparse
 import time
 import math
 
+from torch.utils.tensorboard import SummaryWriter
 import torch
 import torch.backends.cudnn as cudnn
 
 from main_ce import set_loader
 from util import AverageMeter
 from util import adjust_learning_rate, warmup_learning_rate, accuracy
-from util import set_optimizer
+from util import set_optimizer, save_model
 from networks.resnet_big import SupConResNet, LinearClassifier
 
 
@@ -78,6 +80,8 @@ def parse_option():
     # set the path according to the environment
     if opt.data_folder is None:
         opt.data_folder = './datasets/'
+    opt.model_path = './save/classifier/{}_models'.format(opt.dataset)
+    opt.tb_path = './save/classifier/{}_tensorboard'.format(opt.dataset)
 
     iterations = opt.lr_decay_epochs.split(',')
     opt.lr_decay_epochs = list([])
@@ -102,6 +106,14 @@ def parse_option():
                     1 + math.cos(math.pi * opt.warm_epochs / opt.epochs)) / 2
         else:
             opt.warmup_to = opt.learning_rate
+
+    opt.tb_folder = os.path.join(opt.tb_path, opt.model_name)
+    if not os.path.isdir(opt.tb_folder):
+        os.makedirs(opt.tb_folder)
+
+    opt.save_folder = os.path.join(opt.model_path, opt.model_name)
+    if not os.path.isdir(opt.save_folder):
+        os.makedirs(opt.save_folder)
 
     if opt.dataset == 'cifar10':
         opt.n_cls = 10
@@ -208,6 +220,7 @@ def validate(val_loader, model, classifier, criterion, opt):
     batch_time = AverageMeter()
     losses = AverageMeter()
     top1 = AverageMeter()
+    top5 = AverageMeter()
 
     with torch.no_grad():
         end = time.time()
@@ -224,6 +237,7 @@ def validate(val_loader, model, classifier, criterion, opt):
             losses.update(loss.item(), bsz)
             acc1, acc5 = accuracy(output, labels, topk=(1, 5))
             top1.update(acc1[0], bsz)
+            top5.update(acc5[0], bsz)
 
             # measure elapsed time
             batch_time.update(time.time() - end)
@@ -233,16 +247,18 @@ def validate(val_loader, model, classifier, criterion, opt):
                 print('Test: [{0}/{1}]\t'
                       'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                       'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                      'Acc@1 {top1.val:.3f} ({top1.avg:.3f})'.format(
+                      'Acc@1 {top1.val:.3f} ({top1.avg:.3f})\t'
+                      'Acc@1 {top5.val:.3f} ({top5.avg:.3f})'.format(
                        idx, len(val_loader), batch_time=batch_time,
-                       loss=losses, top1=top1))
+                       loss=losses, top1=top1, top5=top5))
 
-    print(' * Acc@1 {top1.avg:.3f}'.format(top1=top1))
-    return losses.avg, top1.avg
+    print(' * Acc@1 {top1.avg:.3f}, Acc@5 {top5.avg:.3f}'.format(top1=top1, top5=top5))
+    return losses.avg, top1.avg, top5.avg
 
 
 def main():
     best_acc = 0
+    best_acc_top5 = 0
     opt = parse_option()
 
     # build data loader
@@ -253,6 +269,9 @@ def main():
 
     # build optimizer
     optimizer = set_optimizer(opt, classifier)
+
+    # tensorboard
+    writer = SummaryWriter(log_dir=opt.tb_folder, flush_secs=2)
 
     # training routine
     for epoch in range(1, opt.epochs + 1):
@@ -265,13 +284,32 @@ def main():
         time2 = time.time()
         print('Train epoch {}, total time {:.2f}, accuracy:{:.2f}'.format(
             epoch, time2 - time1, acc))
+        
+        # tensorboard logger
+        writer.add_scalar('train_loss', loss, epoch)
+        writer.add_scalar('train_acc', acc, epoch)
+        writer.add_scalar('learning_rate', optimizer.param_groups[0]['lr'], epoch)
 
         # eval for one epoch
-        loss, val_acc = validate(val_loader, model, classifier, criterion, opt)
+        loss, val_acc, val_acc_top5 = validate(val_loader, model, classifier, criterion, opt)
+        writer.add_scalar('val_loss', loss, epoch)
+        writer.add_scalar('val_acc', val_acc, epoch)
+        writer.add_scalar('val_acc_top5', val_acc_top5, epoch)
+
         if val_acc > best_acc:
             best_acc = val_acc
+        if val_acc_top5 > best_acc_top5:
+            best_acc_top5 = val_acc_top5
 
-    print('best accuracy: {:.2f}'.format(best_acc))
+    # tensorboard
+    writer.close()
+
+    # save the last classifier
+    save_file = os.path.join(
+        opt.save_folder, 'last.pth')
+    save_model(classifier, optimizer, opt, opt.epochs, save_file)
+
+    print('best accuracy: {:.2f}, best top5 accuracy {:.2f}'.format(best_acc, best_acc_top5))
 
 
 if __name__ == '__main__':
