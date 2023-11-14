@@ -70,6 +70,9 @@ def parse_option():
     parser.add_argument('--pre_comp_feat', action='store_true',
                         help='Use pre computed feature embedding')
 
+    # optional identifier tag
+    parser.add_argument('--tag', type=str, default='')
+
     opt = parser.parse_args()
 
     # check if flag pre_comp_feat is set or dataset is path
@@ -103,6 +106,10 @@ def parse_option():
     opt.model_name = '{}_{}_lr_{}_decay_{}_bsz_{}'.\
         format(opt.dataset, opt.model, opt.learning_rate, opt.weight_decay,
                opt.batch_size)
+
+    # add identifier tag to model name
+    if opt.tag != '':
+        opt.model_name = '{}_{}'.format(opt.model_name, opt.tag)
 
     if opt.cosine:
         opt.model_name = '{}_cosine'.format(opt.model_name)
