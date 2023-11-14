@@ -71,6 +71,9 @@ def parse_option():
     parser.add_argument('--trial', type=str, default='0',
                         help='id for recording multiple runs')
 
+    # optional identifier tag
+    parser.add_argument('--tag', type=str, default='')
+
     opt = parser.parse_args()
 
     # check if dataset is path that passed required arguments
@@ -93,6 +96,10 @@ def parse_option():
     opt.model_name = '{}_{}_{}_lr_{}_decay_{}_bsz_{}_temp_{}_trial_{}'.\
         format(opt.method, opt.dataset, opt.model, opt.learning_rate,
                opt.weight_decay, opt.batch_size, opt.temp, opt.trial)
+
+    # add identifier tag to model name
+    if opt.tag != '':
+        opt.model_name = '{}_{}'.format(opt.model_name, opt.tag)
 
     if opt.cosine:
         opt.model_name = '{}_cosine'.format(opt.model_name)

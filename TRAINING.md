@@ -43,6 +43,18 @@ Classifier training stage:
 CUDA_VISIBLE_DEVICES=2 nohup python main_linear.py --batch_size 26 --batch_size_val 26 --epochs 100 --learning_rate 5 --model resnet18 --dataset path --mean "(0.3837, 0.3704, 0.3072)" --std "(0.3268, 0.3187, 0.3051)" --data_folder ./datasets/animals10_300x300/train/ --test_folder ./datasets/animals10_300x300/test/ --size 300 --num_classes 10 --ckpt ./save/SupCon/path_models/SupCon_path_resnet18_lr_0.5_decay_0.0001_bsz_26_temp_0.1_trial_0_cosine/last.pth > last_classifier.out
 ```
 
+**Resnet18, batchsize: 26, epochs: 300 (2nd try)**
+
+Tensorboard (Pretraining):
+```
+tensorboard --logdir=./save/SupCon/path_tensorboard/SupCon_path_resnet18_lr_0.5_decay_0.0001_bsz_26_temp_0.1_trial_0_try2_cosine
+```
+
+Pretraining stage:
+```
+CUDA_VISIBLE_DEVICES=2 nohup python main_supcon.py --dataset path --data_folder ./datasets/animals10_300x300/train/ --learning_rate 0.5 --temp 0.1 --cosine --model resnet18 --epochs 300 --size 300 --batch_size 26 --method SupCon --mean "(0.3837, 0.3704, 0.3072)" --std "(0.3268, 0.3187, 0.3051)" --tag try2 > supCon_try2.out &
+```
+
 Problem this was trained with --batch_size 16 and --size 32 (default for RandomCrop)
 
 Tensorboard (of the training with RandomCrop size 32):
