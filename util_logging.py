@@ -77,10 +77,44 @@ def create_classifier_training_plots(path_class):
     df_log.plot.line(x='step', y='val_acc', title="Validation top-1 accuracy"
                     ).get_figure().savefig(os.path.join(path_class, "tensorboard", "val_top1.png"))
 
+def create_crossentropy_plots(path):
+    """
+    Creates plots of learning_rate, train_loss and train_acc, val_acc from a tensorboard log
+
+    Parameters
+    --------
+    path: str
+        path to the tenorboard log file (even*) in the form <path>/tensorboard/event*.
+        The same path is used for saving the plots.
+    """
+    df_log = open_tensorboard(path)
+
+    df_log.plot.line(x='step', y='learning_rate', title="Learning rate scheduling"
+                    ).get_figure().savefig(os.path.join(path, "tensorboard", "learning_rate.png"))
+
+    df_log.plot.line(x='step', y='train_loss', title="Training Loss"
+                    ).get_figure().savefig(os.path.join(path, "tensorboard", "loss.png"))
+    
+    df_log.plot.line(x='step', y='train_acc', title="Training top-1 accuracy"
+                    ).get_figure().savefig(os.path.join(path, "tensorboard", "train_top1.png"))
+    
+    df_log.plot.line(x='step', y='val_acc', title="Validation top-1 accuracy"
+                    ).get_figure().savefig(os.path.join(path, "tensorboard", "val_top1.png"))
+
 
 # run.md file for the trained models
-def create_run_md(opt):
-    """Creates a run.md file containing the training parameters"""
+def create_run_md(opt, mode="SupCon"):
+    """
+    Creates a run.md file containing the training parameters
+
+    Parameters
+    ---------
+    opt
+        parse options of the training call
+    mode: str
+        ether "SupCon" for (supervised) contrastive learning
+        of "SupCE" for normal supervised crossentropy loss
+    """
     if opt.dataset == 'cifar10':
         mean = (0.4914, 0.4822, 0.4465)
         std = (0.2023, 0.1994, 0.2010)
@@ -91,27 +125,53 @@ def create_run_md(opt):
         mean = opt.mean
         std = opt.std
 
-    lines = [
-                "<!-- param,tb -->\n"
-                "# Contrastive Training\n\n",
-                "## Training Parameters\n\n",
-                "#### Dataset\n\n",
-                "| dataset | mean | std | size |\n",
-                "|--|--|--|--|\n",
-                f"|{opt.dataset}|{mean}|{std}|{opt.size}|\n\n",
-                "#### Training\n\n",
-                "| model | method | temp | lerning rate | lr decay epochs | lr decay rate | weight decay | momentum | batch size | epochs | cosine | warm |\n",
-                "|--|--|--|--|--|--|--|--|--|--|--|--|\n",
-                f"|{opt.model}|{opt.method}|{opt.temp}|{opt.learning_rate}|{opt.lr_decay_epochs}|{opt.lr_decay_rate}|{opt.weight_decay}|{opt.momentum}|{opt.batch_size}|{opt.epochs}|{opt.cosine}|{opt.warm}|\n\n",
-                "#### Loging\n\n",
-                "| print freq | save freq | num workers | trail | tag |\n",
-                "|--|--|--|--|--|\n",
-                f"|{opt.print_freq}|{opt.save_freq}|{opt.num_workers}|{opt.trial}|{opt.tag}|\n\n",
-                "#### Tensorboard\n\n",
-                "```\n",
-                f"tensorboard --logdir={opt.tb_folder}\n",
-                "```\n\n",
-            ]
+    if mode == "SupCon":
+        lines = [
+                    "<!-- param,tb -->\n"
+                    "# Contrastive Training\n\n",
+                    "## Training Parameters\n\n",
+                    "#### Dataset\n\n",
+                    "| dataset | mean | std | size |\n",
+                    "|--|--|--|--|\n",
+                    f"|{opt.dataset}|{mean}|{std}|{opt.size}|\n\n",
+                    "#### Training\n\n",
+                    "| model | method | temp | learning rate | lr decay epochs | lr decay rate | weight decay | momentum | batch size | epochs | cosine | warm |\n",
+                    "|--|--|--|--|--|--|--|--|--|--|--|--|\n",
+                    f"|{opt.model}|{opt.method}|{opt.temp}|{opt.learning_rate}|{opt.lr_decay_epochs}|{opt.lr_decay_rate}|{opt.weight_decay}|{opt.momentum}|{opt.batch_size}|{opt.epochs}|{opt.cosine}|{opt.warm}|\n\n",
+                    "#### Loging\n\n",
+                    "| print freq | save freq | num workers | trail | tag |\n",
+                    "|--|--|--|--|--|\n",
+                    f"|{opt.print_freq}|{opt.save_freq}|{opt.num_workers}|{opt.trial}|{opt.tag}|\n\n",
+                    "#### Tensorboard\n\n",
+                    "```\n",
+                    f"tensorboard --logdir={opt.tb_folder}\n",
+                    "```\n\n",
+                ]
+    elif mode == "SupCE":
+        lines = [
+                    "<!-- param,tb -->\n"
+                    "# Contrastive Training\n\n",
+                    "## Training Parameters\n\n",
+                    "#### Dataset\n\n",
+                    "| dataset | mean | std | size | num classes |\n",
+                    "|--|--|--|--|--|\n",
+                    f"|{opt.dataset}|{mean}|{std}|{opt.size}|{opt.n_cls}|\n\n",
+                    "#### Training\n\n",
+                    "| model | learning rate | lr decay epochs | lr decay rate | weight decay | momentum | batch size | batch size val | epochs | cosine | warm |\n",
+                    "|--|--|--|--|--|--|--|--|--|--|--|\n",
+                    f"|{opt.model}|{opt.learning_rate}|{opt.lr_decay_epochs}|{opt.lr_decay_rate}|{opt.weight_decay}|{opt.momentum}|{opt.batch_size}|{opt.batch_size_val}|{opt.epochs}|{opt.cosine}|{opt.warm}|\n\n",
+                    "#### Loging\n\n",
+                    "| print freq | save freq | num workers | num workers val | trail | tag |\n",
+                    "|--|--|--|--|--|--|\n",
+                    f"|{opt.print_freq}|{opt.save_freq}|{opt.num_workers}|{opt.num_workers_val}|{opt.trial}|{opt.tag}|\n\n",
+                    "#### Tensorboard\n\n",
+                    "```\n",
+                    f"tensorboard --logdir={opt.tb_folder}\n",
+                    "```\n\n",
+                ]
+    else:
+        raise ValueError(mode)
+
 
     with open(os.path.join(opt.model_path, opt.model_name, "run.md"), "w") as f:
         f.writelines(lines)
@@ -257,7 +317,7 @@ def add_class_to_run_md(path_class, best_acc):
 
     head_entry = f"class{epoch}"
     if head_entry in head:
-        print(f"The t-SNE entry for epoch {epoch} is already in {os.path.join(path, 'run.md')}.")
+        print(f"The classification info for epoch {epoch} is already in {os.path.join(path, 'run.md')}.")
         return
     
     if f"{epoch}" not in head:
@@ -272,5 +332,29 @@ def add_class_to_run_md(path_class, best_acc):
                + ":--:|:--:\n"\
                + f"![plot of classifier training loss]({os.path.join(path_plots, 'train_loss.png')})|"\
                + f"![plot of classifier top-1 validation acc]({os.path.join(path_plots, 'val_top1.png')})\n\n"
+    
+    insert_into_run_md(path, head, lines, inset_idx, text_entry, head_idx, head_entry)
+
+
+def add_class_CE_to_run_md(path, best_acc):
+    """
+    Adds plots of train acc and val acc to the run.md file.
+    Only for crossentropy loss
+    """
+    head, lines = open_run_md(path)
+
+    head_entry = "classlast"
+    if head_entry in head:
+        print(f"The classification info is already in {os.path.join(path, 'run.md')}.")
+        return
+    
+    inset_idx, head_idx = get_insert_line("class", head)
+
+    text_entry = "## Classification\n\n"\
+               + f"**best top-1 validation accuracy: {best_acc:.2f}**\n"\
+               + "top-1 training accuracy | top-1 validation accuracy\n"\
+               + ":--:|:--:\n"\
+               + "![plot of classifier top-1 training acc](./tensorboard/train_top1.png)|"\
+               + "![plot of classifier top-1 validation acc](./tensorboard/val_top1.png)\n\n"
     
     insert_into_run_md(path, head, lines, inset_idx, text_entry, head_idx, head_entry)

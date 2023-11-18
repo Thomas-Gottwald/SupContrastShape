@@ -15,6 +15,8 @@ from util import AverageMeter
 from util import adjust_learning_rate, warmup_learning_rate, accuracy
 from util import set_optimizer, save_model
 from networks.resnet_big import SupCEResNet
+from util_logging import create_run_md, create_crossentropy_plots
+from util_logging import add_train_to_run_md, add_class_CE_to_run_md
 
 
 def parse_option():
@@ -61,12 +63,15 @@ def parse_option():
     # other setting
     parser.add_argument('--cosine', action='store_true',
                         help='using cosine annealing')
-    parser.add_argument('--syncBN', action='store_true',
-                        help='using synchronized batch normalization')
+    # parser.add_argument('--syncBN', action='store_true',
+    #                     help='using synchronized batch normalization')
     parser.add_argument('--warm', action='store_true',
                         help='warm-up for large batch training')
     parser.add_argument('--trial', type=str, default='0',
                         help='id for recording multiple runs')
+    
+    # optional identifier tag
+    parser.add_argument('--tag', type=str, default='')
 
     opt = parser.parse_args()
 
@@ -81,8 +86,9 @@ def parse_option():
     # set the path according to the environment
     if opt.data_folder is None:
         opt.data_folder = './datasets/'
-    opt.model_path = './save/SupCon/{}_models'.format(opt.dataset)
-    opt.tb_path = './save/SupCon/{}_tensorboard'.format(opt.dataset)
+    opt.model_path = './save/SupCE/{}'.format(opt.dataset)
+    # opt.model_path = './save/SupCon/{}_models'.format(opt.dataset)# TODO remove old save structure
+    # opt.tb_path = './save/SupCon/{}_tensorboard'.format(opt.dataset)# TODO remove old save structure
 
     iterations = opt.lr_decay_epochs.split(',')
     opt.lr_decay_epochs = list([])
@@ -92,6 +98,10 @@ def parse_option():
     opt.model_name = 'SupCE_{}_{}_lr_{}_decay_{}_bsz_{}_trial_{}'.\
         format(opt.dataset, opt.model, opt.learning_rate, opt.weight_decay,
                opt.batch_size, opt.trial)
+
+    # add identifier tag to model name
+    if opt.tag != '':
+        opt.model_name = '{}_{}'.format(opt.model_name, opt.tag)
 
     if opt.cosine:
         opt.model_name = '{}_cosine'.format(opt.model_name)
@@ -110,11 +120,13 @@ def parse_option():
         else:
             opt.warmup_to = opt.learning_rate
 
-    opt.tb_folder = os.path.join(opt.tb_path, opt.model_name)
+    opt.tb_folder = os.path.join(opt.model_path, opt.model_name, "tensorboard")
+    # opt.tb_folder = os.path.join(opt.tb_path, opt.model_name)# TODO remove old save structure
     if not os.path.isdir(opt.tb_folder):
         os.makedirs(opt.tb_folder)
 
-    opt.save_folder = os.path.join(opt.model_path, opt.model_name)
+    opt.save_folder = os.path.join(opt.model_path, opt.model_name, "models")
+    # opt.save_folder = os.path.join(opt.model_path, opt.model_name)# TODO remove old save structure
     if not os.path.isdir(opt.save_folder):
         os.makedirs(opt.save_folder)
 
@@ -302,6 +314,9 @@ def main():
     best_acc = 0
     opt = parse_option()
 
+    # create a run.md file containing the training parameters
+    create_run_md(opt, mode="SupCE")
+
     # build data loader
     train_loader, val_loader = set_loader(opt)
 
@@ -351,6 +366,11 @@ def main():
     save_model(model, optimizer, opt, opt.epochs, save_file)
 
     print('best accuracy: {:.2f}'.format(best_acc))
+
+    # add training and validation details to the run.md file
+    create_crossentropy_plots(path=os.path.join(opt.model_path, opt.model_name))
+    add_train_to_run_md(path=os.path.join(opt.model_path, opt.model_name))
+    add_class_CE_to_run_md(path=os.path.join(opt.model_path, opt.model_name), best_acc=best_acc)
 
 
 if __name__ == '__main__':
