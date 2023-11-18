@@ -16,6 +16,7 @@ from util import adjust_learning_rate, warmup_learning_rate, accuracy
 from util import set_optimizer, save_model
 from util_pre_com_feat import set_feature_loader, IdentityWrapperNet
 from networks.resnet_big import SupConResNet, LinearClassifier
+from util_logging import create_classifier_training_plots, add_class_to_run_md
 
 
 def parse_option():
@@ -95,8 +96,17 @@ def parse_option():
     # set the path according to the environment
     if opt.data_folder is None:
         opt.data_folder = './datasets/'
-    opt.model_path = './save/classifier/{}_models'.format(opt.dataset)
-    opt.tb_path = './save/classifier/{}_tensorboard'.format(opt.dataset)
+    if opt.pre_comp_feat:# TODO change save folder structure
+        path_split = opt.test_folder.split('/')
+        assert len(path_split) > 2
+        opt.model_path = os.path.join(*path_split[:-2], "classifier")
+    else:
+        path_split = opt.chkp.split('/')
+        assert len(path_split) > 2
+        epoch = path_split[-1].replace(".pth", '').split('_')[-1]
+        opt.model_path = os.path.join(*path_split[:-2], f"val_{epoch}", "classifier")
+    # opt.model_path = './save/classifier/{}_models'.format(opt.dataset)
+    # opt.tb_path = './save/classifier/{}_tensorboard'.format(opt.dataset)
 
     iterations = opt.lr_decay_epochs.split(',')
     opt.lr_decay_epochs = list([])
@@ -129,11 +139,13 @@ def parse_option():
     if opt.pre_comp_feat:
         opt.model_name = '{}_pre_comp_feat'.format(opt.model_name)
 
-    opt.tb_folder = os.path.join(opt.tb_path, opt.model_name)
+    opt.tb_folder = os.path.join(opt.model_path, opt.model_name, "tensorboard")# TODO change save folder structure
+    # opt.tb_folder = os.path.join(opt.tb_path, opt.model_name)
     if not os.path.isdir(opt.tb_folder):
         os.makedirs(opt.tb_folder)
 
-    opt.save_folder = os.path.join(opt.model_path, opt.model_name)
+    opt.save_folder = os.path.join(opt.model_path, opt.model_name, "models")# TODO change save folder structure
+    # opt.save_folder = os.path.join(opt.model_path, opt.model_name)
     if not os.path.isdir(opt.save_folder):
         os.makedirs(opt.save_folder)
 
@@ -343,6 +355,10 @@ def main():
     save_model(classifier, optimizer, opt, opt.epochs, save_file)
 
     print('best accuracy: {:.2f}, best top5 accuracy {:.2f}'.format(best_acc, best_acc_top5))
+
+    # add classifier training details to the run.md file
+    create_classifier_training_plots(path_class=os.path.join(opt.model_path, opt.model_name))
+    add_class_to_run_md(path_class=os.path.join(opt.model_path, opt.model_name), best_acc=best_acc)
 
 
 if __name__ == '__main__':

@@ -4,9 +4,14 @@
 
 **Resnet50, batchsize: 400, epochs: 300**
 
-Tensorboard (Pretraining):
+<!-- Tensorboard (Pretraining):
 ```
 tensorboard --logdir=./save/SupCon/cifar10_tensorboard/SupCon_cifar10_resnet50_lr_0.5_decay_0.0001_bsz_400_temp_0.1_trial_0_cosine_warm
+``` -->
+
+Tensorboard (Pretraining):
+```
+tensorboard --logdir=./save/SupCon/cifar10/SupCon_cifar10_resnet50_lr_0.5_decay_0.0001_bsz_400_temp_0.1_trial_0_cosine_warm/tensorboard
 ```
 
 Pretraining stage:

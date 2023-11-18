@@ -16,6 +16,7 @@ from util import adjust_learning_rate, warmup_learning_rate
 from util import set_optimizer, save_model
 from networks.resnet_big import SupConResNet
 from losses import SupConLoss
+from util_logging import create_run_md, create_training_plots, add_train_to_run_md
 
 
 def parse_option():
@@ -85,8 +86,9 @@ def parse_option():
     # set the path according to the environment
     if opt.data_folder is None:
         opt.data_folder = './datasets/'
-    opt.model_path = './save/SupCon/{}_models'.format(opt.dataset)
-    opt.tb_path = './save/SupCon/{}_tensorboard'.format(opt.dataset)
+    opt.model_path = './save/SupCon/{}'.format(opt.dataset)
+    # opt.model_path = './save/SupCon/{}_models'.format(opt.dataset)# TODO remove old save structure
+    # opt.tb_path = './save/SupCon/{}_tensorboard'.format(opt.dataset)# TODO remove old save structure
 
     iterations = opt.lr_decay_epochs.split(',')
     opt.lr_decay_epochs = list([])
@@ -118,11 +120,13 @@ def parse_option():
         else:
             opt.warmup_to = opt.learning_rate
 
-    opt.tb_folder = os.path.join(opt.tb_path, opt.model_name)
+    opt.tb_folder = os.path.join(opt.model_path, opt.model_name, "tensorboard")
+    # opt.tb_folder = os.path.join(opt.tb_path, opt.model_name)# TODO remove old save structure
     if not os.path.isdir(opt.tb_folder):
         os.makedirs(opt.tb_folder)
 
-    opt.save_folder = os.path.join(opt.model_path, opt.model_name)
+    opt.save_folder = os.path.join(opt.model_path, opt.model_name, "models")
+    # opt.save_folder = os.path.join(opt.model_path, opt.model_name)# TODO remove old save structure
     if not os.path.isdir(opt.save_folder):
         os.makedirs(opt.save_folder)
 
@@ -254,6 +258,9 @@ def train(train_loader, model, criterion, optimizer, epoch, opt):
 def main():
     opt = parse_option()
 
+    # create a run.md file containing the training parameters
+    create_run_md(opt)
+
     # build data loader
     train_loader = set_loader(opt)
 
@@ -292,6 +299,10 @@ def main():
     save_file = os.path.join(
         opt.save_folder, 'last.pth')
     save_model(model, optimizer, opt, opt.epochs, save_file)
+
+    # add training details to the run.md file
+    create_training_plots(path=os.path.join(opt.model_path, opt.model_name))
+    add_train_to_run_md(path=os.path.join(opt.model_path, opt.model_name))
 
 
 if __name__ == '__main__':
