@@ -51,8 +51,9 @@ def parse_option():
 
     # model dataset
     parser.add_argument('--model', type=str, default='resnet50')
-    parser.add_argument('--dataset', type=str, default='cifar10',
-                        choices=['cifar10', 'cifar100', 'path'], help='dataset')
+    parser.add_argument('--dataset', type=str, default='cifar10', help='dataset')
+    # parser.add_argument('--dataset', type=str, default='cifar10',# TODO remove "path dataset"
+    #                     choices=['cifar10', 'cifar100', 'path'], help='dataset')
     parser.add_argument('--mean', type=str, help='mean of dataset in path in form of str tuple')
     parser.add_argument('--std', type=str, help='std of dataset in path in form of str tuple')
     parser.add_argument('--data_folder', type=str, default=None, help='path to custom dataset training data')
@@ -81,9 +82,11 @@ def parse_option():
     if opt.pre_comp_feat:
         assert opt.data_folder is not None \
             and opt.test_folder is not None
-        if opt.dataset == 'path':
+        if opt.dataset not in ['cifar10', 'cifar100']:
+        # if opt.dataset == 'path':# TODO remove "path dataset"
             assert opt.num_classes is not None
-    elif opt.dataset == 'path':
+    elif opt.dataset not in ['cifar10', 'cifar100']:
+    # elif opt.dataset == 'path':# TODO remove "path dataset"
         assert opt.data_folder is not None \
             and opt.test_folder is not None \
             and opt.mean is not None \
@@ -105,8 +108,8 @@ def parse_option():
         assert len(path_split) > 2
         epoch = path_split[-1].replace(".pth", '').split('_')[-1]
         opt.model_path = os.path.join(*path_split[:-2], f"val_{epoch}", "classifier")
-    # opt.model_path = './save/classifier/{}_models'.format(opt.dataset)
-    # opt.tb_path = './save/classifier/{}_tensorboard'.format(opt.dataset)
+    # opt.model_path = './save/classifier/{}_models'.format(opt.dataset)# TODO change save folder structure
+    # opt.tb_path = './save/classifier/{}_tensorboard'.format(opt.dataset)# TODO change save folder structure
 
     iterations = opt.lr_decay_epochs.split(',')
     opt.lr_decay_epochs = list([])
@@ -153,10 +156,11 @@ def parse_option():
         opt.n_cls = 10
     elif opt.dataset == 'cifar100':
         opt.n_cls = 100
-    elif opt.dataset == 'path':
-        opt.n_cls = opt.num_classes
     else:
-        raise ValueError('dataset not supported: {}'.format(opt.dataset))
+    # elif opt.dataset == 'path':# TODO remove "path dataset"
+        opt.n_cls = opt.num_classes
+    # else:# TODO remove "path dataset"
+    #     raise ValueError('dataset not supported: {}'.format(opt.dataset))
 
     return opt
 

@@ -2,7 +2,10 @@ import os
 import glob
 import re
 import pandas as pd
+import seaborn
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
+
+seaborn.set_theme(style="darkgrid")
 
 
 # Convert teonsorboard logs into plots
@@ -121,7 +124,8 @@ def create_run_md(opt, mode="SupCon"):
     elif opt.dataset == 'cifar100':
         mean = (0.5071, 0.4867, 0.4408)
         std = (0.2675, 0.2565, 0.2761)
-    elif opt.dataset == 'path':
+    else:
+    # elif opt.dataset == 'path':# TODO remove "path dataset"
         mean = opt.mean
         std = opt.std
 
