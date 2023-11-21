@@ -57,7 +57,7 @@ def parse_option():
 
     # method
     parser.add_argument('--method', type=str, default='SupCon',
-                        choices=['SupCon', 'SimCLR', 'SupCon_hybrid'], help='choose method')
+                        choices=['SupCon', 'SimCLR', 'SupConHybrid'], help='choose method')
 
     # temperature
     parser.add_argument('--temp', type=float, default=0.07,
@@ -228,7 +228,7 @@ def train(train_loader, model, criterion, optimizer, epoch, opt):
             loss = criterion(features, labels)
         elif opt.method == 'SimCLR':
             loss = criterion(features)
-        elif opt.method == 'SupCon_hybrid':
+        elif opt.method == 'SupConHybrid':
             loss = criterion(features, labels, hybrid=True)
         else:
             raise ValueError('contrastive method not supported: {}'.
