@@ -48,8 +48,6 @@ def parse_option():
     # model dataset
     parser.add_argument('--model', type=str, default='resnet50')
     parser.add_argument('--dataset', type=str, default='cifar10', help='dataset')
-    # parser.add_argument('--dataset', type=str, default='cifar10',
-    #                     choices=['cifar10', 'cifar100', 'path'], help='dataset')# TODO remove "path dataset"
     parser.add_argument('--mean', type=str, help='mean of dataset in path in form of str tuple')
     parser.add_argument('--std', type=str, help='std of dataset in path in form of str tuple')
     parser.add_argument('--data_folder', type=str, default=None, help='path to custom dataset')
@@ -66,8 +64,6 @@ def parse_option():
     # other setting
     parser.add_argument('--cosine', action='store_true',
                         help='using cosine annealing')
-    # parser.add_argument('--syncBN', action='store_true',
-    #                     help='using synchronized batch normalization')
     parser.add_argument('--warm', action='store_true',
                         help='warm-up for large batch training')
     parser.add_argument('--trial', type=str, default='0',
@@ -80,7 +76,6 @@ def parse_option():
 
     # check if dataset is path that passed required arguments
     if opt.dataset not in ['cifar10', 'cifar100']:
-    # if opt.dataset == 'path':# TODO remove "path dataset"
         assert opt.data_folder is not None \
             and opt.mean is not None \
             and opt.std is not None
@@ -89,8 +84,6 @@ def parse_option():
     if opt.data_folder is None:
         opt.data_folder = './datasets/'
     opt.model_path = './save/SupCon/{}'.format(opt.dataset)
-    # opt.model_path = './save/SupCon/{}_models'.format(opt.dataset)# TODO remove old save structure
-    # opt.tb_path = './save/SupCon/{}_tensorboard'.format(opt.dataset)# TODO remove old save structure
 
     iterations = opt.lr_decay_epochs.split(',')
     opt.lr_decay_epochs = list([])
@@ -123,12 +116,10 @@ def parse_option():
             opt.warmup_to = opt.learning_rate
 
     opt.tb_folder = os.path.join(opt.model_path, opt.model_name, "tensorboard")
-    # opt.tb_folder = os.path.join(opt.tb_path, opt.model_name)# TODO remove old save structure
     if not os.path.isdir(opt.tb_folder):
         os.makedirs(opt.tb_folder)
 
     opt.save_folder = os.path.join(opt.model_path, opt.model_name, "models")
-    # opt.save_folder = os.path.join(opt.model_path, opt.model_name)# TODO remove old save structure
     if not os.path.isdir(opt.save_folder):
         os.makedirs(opt.save_folder)
 
@@ -144,11 +135,8 @@ def set_loader(opt):
         mean = (0.5071, 0.4867, 0.4408)
         std = (0.2675, 0.2565, 0.2761)
     else:
-    # elif opt.dataset == 'path':# TODO remove "path dataset"
         mean = eval(opt.mean)
         std = eval(opt.std)
-    # else:# TODO remove "path dataset"
-    #     raise ValueError('dataset not supported: {}'.format(opt.dataset))
     normalize = transforms.Normalize(mean=mean, std=std)
 
     train_transform = transforms.Compose([
@@ -171,11 +159,8 @@ def set_loader(opt):
                                           transform=TwoCropTransform(train_transform),
                                           download=True)
     else:
-    # elif opt.dataset == 'path':# TODO remove "path dataset"
         train_dataset = datasets.ImageFolder(root=opt.data_folder,
                                             transform=TwoCropTransform(train_transform))
-    # else:# TODO remove "path dataset"
-    #     raise ValueError(opt.dataset)
 
     train_sampler = None
     train_loader = torch.utils.data.DataLoader(

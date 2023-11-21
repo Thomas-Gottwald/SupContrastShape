@@ -125,7 +125,6 @@ def create_run_md(opt, mode="SupCon"):
         mean = (0.5071, 0.4867, 0.4408)
         std = (0.2675, 0.2565, 0.2761)
     else:
-    # elif opt.dataset == 'path':# TODO remove "path dataset"
         mean = opt.mean
         std = opt.std
 
