@@ -40,7 +40,7 @@ CUDA_VISIBLE_DEVICES=2 nohup python main_supcon.py --dataset animals10 --data_fo
 
 Training:
 ```
-CUDA_VISIBLE_DEVICES=2 nohup python main_ce.py --dataset animals10 --data_folder ./datasets/animals10_300x300/train/ --test_folder ./datasets/animals10_300x300/test/ --num_classes 10 --learning_rate 0.125 --model resnet18 --epochs 500 --size 300 --batch_size 26 --batch_size_val 26 --mean "(0.3837, 0.3704, 0.3072)" --std "(0.3268, 0.3187, 0.3051)" --tag baseline > supCE_baseline.out &
+CUDA_VISIBLE_DEVICES=2 nohup python main_ce.py --dataset animals10 --data_folder ./datasets/animals10_300x300/train/ --test_folder ./datasets/animals10_300x300/test/ --num_classes 10 --learning_rate 0.125 --cosine --model resnet18 --epochs 500 --size 300 --batch_size 26 --batch_size_val 26 --mean "(0.3837, 0.3704, 0.3072)" --std "(0.3268, 0.3187, 0.3051)" --tag baseline > supCE_baseline.out &
 ```
 
 # Adjusting Learning Rate

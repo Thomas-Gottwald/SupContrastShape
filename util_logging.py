@@ -217,18 +217,14 @@ def get_insert_line(entry, head, epoch="last"):
                     if new_epoch != "last" and numbers:
                         val = int(numbers.group(0))
                         if val < int(new_epoch) or (check and val <= int(new_epoch)):
-                            # print("lower", val, h, n)
                             count_lines += lines_dict[n]
                             count_entries += 1
                     elif new_epoch != "last" or (not numbers and check):
-                        # print(h, n)
                         count_lines += lines_dict[n]
                         count_entries += 1
                 else:
-                    # print(h, n)
                     count_lines += lines_dict[n]
                     count_entries += 1
-    # print(count_lines)
     return count_lines, count_entries
 
 
