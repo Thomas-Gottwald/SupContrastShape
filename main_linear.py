@@ -59,6 +59,19 @@ def parse_option():
     parser.add_argument('--size', type=int, default=32, help='parameter for RandomResizedCrop')
     parser.add_argument('--num_classes', type=int, default=None, help='number of classes in the custom dataset')
 
+    # augmentation
+    parser.add_argument('--aug', nargs='*', default=['resizedCrop', 'horizontalFlip'],
+                        choices=['resizedCrop', 'horizontalFlip', 'colorJitter', 'grayscale'],
+                        type=str, help='list of the used image augmentations')
+    defaultResizedCrop = [0.2, 1.0, 3/4, 4/3]
+    parser.add_argument('--resizedCrop', nargs='+', default=defaultResizedCrop,
+                        type=float, help='crop scale lower and upper bound and resize lower and upper bound for aspect ratio')
+    parser.add_argument('--horizontalFlip', default=0.5, type=float, help='probability for horizontal flip')
+    defaultColorJitter = [0.8, 0.4, 0.4, 0.4, 0.4]
+    parser.add_argument('--colorJitter', nargs='+', default=defaultColorJitter,
+                        type=float, help='probability to apply colorJitter and how much to jitter brightness, contrast, saturation and hue')
+    parser.add_argument('--grayscale', default=0.2, type=float, help='probability for random grayscale')
+
     # other setting
     parser.add_argument('--cosine', action='store_true',
                         help='using cosine annealing')
@@ -135,6 +148,17 @@ def parse_option():
 
     if opt.pre_comp_feat:
         opt.model_name = '{}_pre_comp_feat'.format(opt.model_name)
+
+    # parameters for randomResizedCrop
+    if len(opt.resizedCrop) < len(defaultResizedCrop):
+        opt.resizedCrop.extend(defaultResizedCrop[len(opt.resizedCrop):])
+    elif len(opt.resizedCrop) > len(defaultResizedCrop):
+        opt.resizedCrop = opt.resizedCrop[:len(defaultResizedCrop)]
+    # parameters for colorJitter
+    if len(opt.colorJitter) < len(defaultColorJitter):
+        opt.colorJitter.extend(defaultColorJitter[len(opt.colorJitter):])
+    elif len(opt.colorJitter) > len(defaultColorJitter):
+        opt.colorJitter = opt.colorJitter[:len(defaultColorJitter)]
 
     opt.tb_folder = os.path.join(opt.model_path, opt.model_name, "tensorboard")
     if not os.path.isdir(opt.tb_folder):

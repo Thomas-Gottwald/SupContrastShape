@@ -16,6 +16,8 @@ from util import adjust_learning_rate, warmup_learning_rate
 from util import set_optimizer, save_model
 from networks.resnet_big import SupConResNet
 from losses import SupConLoss
+from util_diff import DiffLoader, DiffTransform
+from util_diff import SameTwoRandomResizedCrop, SameTwoColorJitter, SameTwoApply
 from util_logging import create_run_md, create_training_plots, add_train_to_run_md
 
 
@@ -52,6 +54,7 @@ def parse_option():
     parser.add_argument('--std', type=str, help='std of dataset in path in form of str tuple')
     parser.add_argument('--data_folder', type=str, default=None, help='path to custom dataset')
     parser.add_argument('--size', type=int, default=32, help='parameter for RandomResizedCrop')
+    parser.add_argument('--diff_folder', type=str, default=None, help='path to diffused dataset')
 
     # method
     parser.add_argument('--method', type=str, default='SupCon',
@@ -60,6 +63,19 @@ def parse_option():
     # temperature
     parser.add_argument('--temp', type=float, default=0.07,
                         help='temperature for loss function')
+    
+    # augmentation
+    parser.add_argument('--aug', nargs='*', default=['resizedCrop', 'horizontalFlip', 'colorJitter', 'grayscale'],
+                        choices=['resizedCrop', 'horizontalFlip', 'colorJitter', 'grayscale', 'sameResizedCrop', 'sameHorizontalFlip', 'sameColorJitter', 'sameGrayscale'],
+                        type=str, help='list of the used image augmentations')
+    defaultResizedCrop = [0.2, 1.0, 3/4, 4/3]
+    parser.add_argument('--resizedCrop', nargs='+', default=defaultResizedCrop,
+                        type=float, help='crop scale lower and upper bound and resize lower and upper bound for aspect ratio')
+    parser.add_argument('--horizontalFlip', default=0.5, type=float, help='probability for horizontal flip')
+    defaultColorJitter = [0.8, 0.4, 0.4, 0.4, 0.4]
+    parser.add_argument('--colorJitter', nargs='+', default=defaultColorJitter,
+                        type=float, help='probability to apply colorJitter and how much to jitter brightness, contrast, saturation and hue')
+    parser.add_argument('--grayscale', default=0.2, type=float, help='probability for random grayscale')
 
     # other setting
     parser.add_argument('--cosine', action='store_true',
@@ -79,6 +95,12 @@ def parse_option():
         assert opt.data_folder is not None \
             and opt.mean is not None \
             and opt.std is not None
+
+    # check that of each augmentation type only one of the independent or identical is passed
+    assert not('resizedCrop' in opt.aug and 'sameResizedCrop' in opt.aug)\
+        and not('horizontalFlip' in opt.aug and 'sameHorizontalFlip' in opt.aug)\
+        and not('colorJitter' in opt.aug and 'sameColorJitter' in opt.aug)\
+        and not('grayscale' in opt.aug and 'sameGrayscale' in opt.aug)
 
     # set the path according to the environment
     if opt.data_folder is None:
@@ -115,6 +137,17 @@ def parse_option():
         else:
             opt.warmup_to = opt.learning_rate
 
+    # parameters for randomResizedCrop
+    if len(opt.resizedCrop) < len(defaultResizedCrop):
+        opt.resizedCrop.extend(defaultResizedCrop[len(opt.resizedCrop):])
+    elif len(opt.resizedCrop) > len(defaultResizedCrop):
+        opt.resizedCrop = opt.resizedCrop[:len(defaultResizedCrop)]
+    # parameters for colorJitter
+    if len(opt.colorJitter) < len(defaultColorJitter):
+        opt.colorJitter.extend(defaultColorJitter[len(opt.colorJitter):])
+    elif len(opt.colorJitter) > len(defaultColorJitter):
+        opt.colorJitter = opt.colorJitter[:len(defaultColorJitter)]
+
     opt.tb_folder = os.path.join(opt.model_path, opt.model_name, "tensorboard")
     if not os.path.isdir(opt.tb_folder):
         os.makedirs(opt.tb_folder)
@@ -139,28 +172,62 @@ def set_loader(opt):
         std = eval(opt.std)
     normalize = transforms.Normalize(mean=mean, std=std)
 
-    train_transform = transforms.Compose([
-        transforms.RandomResizedCrop(size=opt.size, scale=(0.2, 1.)),
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomApply([
-            transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
-        ], p=0.8),
-        transforms.RandomGrayscale(p=0.2),
-        transforms.ToTensor(),
-        normalize,
-    ])
+    train_same_transform = None
+    same_transform_list = []
+    if 'sameResizedCrop' in opt.aug:
+        scaleMin, scaleMax, ratioMin, ratioMax = opt.resizedCrop
+        same_transform_list.append(SameTwoRandomResizedCrop(size=opt.size, scale=(scaleMin, scaleMax), ratio=(ratioMin, ratioMax)))
+    if 'sameHorizontalFlip' in opt.aug:
+        same_transform_list.append(transforms.RandomApply([
+            SameTwoApply(transforms.RandomHorizontalFlip(p=1.0))
+        ], p=opt.horizontalFlip))
+    if 'sameColorJitter' in opt.aug:
+        pJitter, brightness, contrast, saturation, hue = opt.colorJitter
+        same_transform_list.append(transforms.RandomApply([
+            SameTwoColorJitter(brightness, contrast, saturation, hue)
+        ], p=pJitter))
+    if 'sameGrayscale' in opt.aug:
+        same_transform_list.append(transforms.RandomApply([
+            SameTwoApply(transforms.RandomGrayscale(p=1.0))
+        ], p=opt.grayscale))
+    if len(same_transform_list) > 0:
+        train_same_transform = transforms.Compose(same_transform_list)
 
-    if opt.dataset == 'cifar10':
-        train_dataset = datasets.CIFAR10(root=opt.data_folder,
-                                         transform=TwoCropTransform(train_transform),
-                                         download=True)
-    elif opt.dataset == 'cifar100':
-        train_dataset = datasets.CIFAR100(root=opt.data_folder,
-                                          transform=TwoCropTransform(train_transform),
-                                          download=True)
-    else:
+    transform_list = []
+    if 'resizedCrop' in opt.aug:
+        scaleMin, scaleMax, ratioMin, ratioMax = opt.resizedCrop
+        transform_list.append(transforms.RandomResizedCrop(size=opt.size, scale=(scaleMin, scaleMax), ratio=(ratioMin, ratioMax)))
+    if 'horizontalFlip' in opt.aug:
+        transform_list.append(transforms.RandomHorizontalFlip(p=opt.horizontalFlip))
+    if 'colorJitter' in opt.aug:
+        pJitter, brightness, contrast, saturation, hue = opt.colorJitter
+        transform_list.append(transforms.RandomApply([
+            transforms.ColorJitter(brightness, contrast, saturation, hue)
+        ], p=pJitter))
+    if 'grayscale' in opt.aug:
+        transform_list.append(transforms.RandomGrayscale(p=opt.grayscale))
+    transform_list.extend([
+        transforms.ToTensor(),
+        normalize
+    ])
+    train_transform = transforms.Compose(transform_list)
+
+    if opt.diff_folder:
         train_dataset = datasets.ImageFolder(root=opt.data_folder,
-                                            transform=TwoCropTransform(train_transform))
+                                            loader=DiffLoader(path_orig=opt.data_folder, path_diff=opt.diff_folder),
+                                            transform=DiffTransform(train_transform, train_same_transform))
+    else:
+        if opt.dataset == 'cifar10':
+            train_dataset = datasets.CIFAR10(root=opt.data_folder,
+                                            transform=TwoCropTransform(train_transform),
+                                            download=True)
+        elif opt.dataset == 'cifar100':
+            train_dataset = datasets.CIFAR100(root=opt.data_folder,
+                                            transform=TwoCropTransform(train_transform),
+                                            download=True)
+        else:
+            train_dataset = datasets.ImageFolder(root=opt.data_folder,
+                                                transform=TwoCropTransform(train_transform))
 
     train_sampler = None
     train_loader = torch.utils.data.DataLoader(

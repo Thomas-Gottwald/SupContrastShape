@@ -20,11 +20,42 @@ class SameTwoRandomResizedCrop:
         x_orig, x_diff = x
         i,j,h,w = transforms.RandomResizedCrop.get_params(x_orig, scale=self.scale, ratio=self.ratio)
 
-        y_orig = transforms.functional.resized_crop(x_orig, i, j, h, w, size=self.size)
-        y_diff = transforms.functional.resized_crop(x_diff, i, j, h, w, size=self.size)
+        x_orig = transforms.functional.resized_crop(x_orig, i, j, h, w, size=self.size)
+        x_diff = transforms.functional.resized_crop(x_diff, i, j, h, w, size=self.size)
 
-        return [y_orig, y_diff]
+        return [x_orig, x_diff]
     
+
+class SameTwoColorJitter:
+    """Applies the same random color jitter to two images"""
+    def __init__(self, brightness=0, contrast=0, saturation=0, hue=0):
+        self.brightness = (max(0,1-brightness), 1+brightness)
+        self.contrast = (max(0,1-contrast), 1+contrast)
+        self.saturation = (max(0,1-saturation), 1+saturation)
+        self.hue = (-hue, hue)
+
+    def adjust_color_component(img, factor, component):
+        if component == 0:
+            return transforms.functional.adjust_brightness(img, factor)
+        elif component == 1:
+            return transforms.functional.adjust_contrast(img, factor)
+        elif component == 2:
+            return transforms.functional.adjust_saturation(img, factor)
+        else:
+            return transforms.functional.adjust_hue(img, factor)
+
+    def __call__(self, x):
+        x_orig, x_diff = x
+
+        order,b,c,s,h = transforms.ColorJitter.get_params(self.brightness, self.contrast, self.saturation, self.hue)
+        factors = b,c,s,h
+
+        for c in order:
+            x_orig = SameTwoColorJitter.adjust_color_component(x_orig, factors[c], c)
+            x_diff = SameTwoColorJitter.adjust_color_component(x_diff, factors[c], c)
+
+        return [x_orig, x_diff]
+
 
 class SameTwoApply:
     """Applies the same transform to two images"""
@@ -44,10 +75,9 @@ class DiffTransform:
 
     def __call__(self, x):
         if self.same_transform:
-            x_transf = self.same_transform(x)
+            x_orig, x_diff = self.same_transform(x)
         else:
-            x_transf = x
-        x_orig, x_diff = x_transf
+            x_orig, x_diff = x
         return [self.transform(x_orig), self.transform(x_diff)]
     
 

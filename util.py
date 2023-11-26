@@ -8,11 +8,16 @@ import torch.optim as optim
 
 class TwoCropTransform:
     """Create two crops of the same image"""
-    def __init__(self, transform):
+    def __init__(self, transform, same_transform=None):
         self.transform = transform
+        self.same_transform = same_transform
 
     def __call__(self, x):
-        return [self.transform(x), self.transform(x)]
+        if self.same_transform:
+            x1, x2 = self.same_transform((x,x))
+            return [self.transform(x1), self.transform(x2)]
+        else:
+            return [self.transform(x), self.transform(x)]
 
 
 class AverageMeter(object):
