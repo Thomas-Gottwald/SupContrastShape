@@ -198,9 +198,10 @@ def insert_into_run_md(path, head, lines, inset_idx, text_entry, head_idx, head_
 
 
 def get_insert_line(entry, head, epoch="last"):
-    lines_dict = {"param": 22, "tb": 6, "train": 6, "val": 2, "epoch": 2, "tsne": 6, "class": 7}
-    re_pattern = {"param": "param", "tb": "tb", "train": "train", "val": "val", "epoch": "last|[0-9]+", "tsne": "tsne(last|[0-9]+)", "class": "class(last|[0-9]+)"}
-    entry_dict = {"train": (2,""), "val": (3,""), "epoch": (7,""), "tsne": (7,"last|[0-9]+"), "class": (7,"(tsne)?(last|[0-9]+)")}
+    lines_dict = {"param": 22, "tb": 6, "train": 6, "val": 2, "epoch": 2, "tsne": 6, "class": 7, "cm": 7}
+    re_pattern = {"param": "param", "tb": "tb", "train": "train", "val": "val", "epoch": "last|[0-9]+", "tsne": "tsne(last|[0-9]+)", "class": "class(last|[0-9]+)", "cm": "cm(last|[0-9]+)"}
+    entry_dict = {"train": (2,""), "val": (3,""), "epoch": (8,""), "tsne": (8,"last|[0-9]+"), "class": (8,"(tsne)?(last|[0-9]+)"), "cm": (8,"(tsne|class)?(last|[0-9]+)")}
+    # entry_dict = {"train": (2,""), "val": (3,""), "epoch": (7,""), "tsne": (7,"last|[0-9]+"), "class": (7,"(tsne)?(last|[0-9]+)"), "cm": (7,"(tsne|class)?(last|[0-9]+)")}
 
     num_head, re_check = entry_dict[entry]
     new_epoch = f"{epoch}"
@@ -355,5 +356,34 @@ def add_class_CE_to_run_md(path, best_acc):
                + ":--:|:--:\n"\
                + "![plot of classifier top-1 training acc](./tensorboard/train_top1.png)|"\
                + "![plot of classifier top-1 validation acc](./tensorboard/val_top1.png)\n\n"
+    
+    insert_into_run_md(path, head, lines, inset_idx, text_entry, head_idx, head_entry)
+
+
+def add_confusion_matrix_to_run_md(path_class, acc, acc_b):
+    """Adds plots of the confusion matrix for training and test data to the run.md file"""
+    path = path_class.split('/')
+    epoch = path[-3].replace("val_", '')
+    path_plots = os.path.join(*path[-3:], "models")
+    path = os.path.join(*path[:-3])
+    head, lines = open_run_md(path)
+
+    head_entry = f"cm{epoch}"
+    if head_entry in head:
+        print(f"The confusion matrix plots for epoch {epoch} are already in {os.path.join(path, 'run.md')}.")
+        return
+    
+    if f"{epoch}" not in head:
+        add_epoch_to_run_md(path, epoch)
+        head, lines = open_run_md(path)
+
+    inset_idx, head_idx = get_insert_line("cm", head, epoch)
+
+    text_entry = "#### Confusion Matrix\n\n"\
+               + f"**Accuracy: {acc:.2f}, Balanced Accuracy: {acc_b:.2f}**\n"\
+               + "Training | Test\n"\
+               + ":--:|:--:\n"\
+               + f"![plot of classifier training loss]({os.path.join(path_plots, f'cm_train_epoch_{epoch}.png')})|"\
+               + f"![plot of classifier top-1 validation acc]({os.path.join(path_plots, f'cm_val_epoch_{epoch}.png')})\n\n"
     
     insert_into_run_md(path, head, lines, inset_idx, text_entry, head_idx, head_entry)
