@@ -180,8 +180,36 @@ def create_run_md(opt, mode="SupCon"):
         f.writelines(lines)
 
 
+def create_val_md(path_val_md, dataset_val):
+    """
+    Creates markdown file to store validation with a different dataset.
+
+    Parameters
+    ---------
+    path_val_md: str
+        path the markdown validation file.
+        Needs to end with '.md' and be at the same location as run.md
+    dataset_val: str
+        name of the dataset used for validation
+    """
+    lines = [
+                "<!-- val -->\n",
+                f"# Validation with {dataset_val}\n\n"
+    ]
+
+    with open(path_val_md, "w") as f:
+        f.writelines(lines)
+
+
+def set_path_md(path):
+    if len(path) > 3 and path[-3:] == '.md':
+        return path
+    else:
+        return os.path.join(path, 'run.md')
+
+
 def open_run_md(path):
-    with open(os.path.join(path, "run.md"), "r") as f:
+    with open(set_path_md(path), 'r') as f:
         lines = f.readlines()
     head = lines[0].replace("<!-- ", '').replace(" -->\n", '').split(',')
 
@@ -193,7 +221,7 @@ def insert_into_run_md(path, head, lines, inset_idx, text_entry, head_idx, head_
     head.insert(head_idx, head_entry)
     lines[0] = "<!-- " + ','.join(head) + " -->\n"
 
-    with open(os.path.join(path, "run.md"), "w") as f:
+    with open(set_path_md(path), 'w') as f:
         f.writelines(lines)
 
 
@@ -234,7 +262,7 @@ def add_val_to_run_md(path):
 
     head_entry = "val"
     if head_entry in head:
-        print(f"Validation headline already in {os.path.join(path, 'run.md')}.")
+        print(f"Validation headline already in {set_path_md(path)}.")
         return
 
     inset_idx, head_idx = get_insert_line("val", head)
@@ -249,7 +277,7 @@ def add_epoch_to_run_md(path, epoch):
 
     head_entry = f"{epoch}"
     if head_entry in head:
-        print(f"Epoch {epoch} headline already in {os.path.join(path, 'run.md')}.")
+        print(f"Epoch {epoch} headline already in {set_path_md(path)}.")
         return
 
     if "val" not in head:
@@ -269,7 +297,7 @@ def add_train_to_run_md(path):
 
     head_entry = "train"
     if head_entry in head:
-        print(f"The training info is already in {os.path.join(path, 'run.md')}.")
+        print(f"The training info is already in {set_path_md(path)}.")
         return
     
     inset_idx, head_idx = get_insert_line("train", head)
@@ -283,13 +311,13 @@ def add_train_to_run_md(path):
     insert_into_run_md(path, head, lines, inset_idx, text_entry, head_idx, head_entry)
 
 
-def add_tsne_to_run_md(path, epoch):
+def add_tsne_to_run_md(path, epoch, dataset_val=None):
     """Adds links plots of t-SNE embeddings of a specific epoch to the run.md file"""
     head, lines = open_run_md(path)
 
     head_entry = f"tsne{epoch}"
     if head_entry in head:
-        print(f"The t-SNE entry for epoch {epoch} is already in {os.path.join(path, 'run.md')}.")
+        print(f"The t-SNE entry for epoch {epoch} is already in {set_path_md(path)}.")
         return
     
     if f"{epoch}" not in head:
@@ -298,26 +326,34 @@ def add_tsne_to_run_md(path, epoch):
 
     inset_idx, head_idx = get_insert_line("tsne", head, epoch)
 
+    if dataset_val == None:
+        val_folder = f"val_{epoch}"
+    else:
+        val_folder = f"val_{dataset_val}_{epoch}"
+
     text_entry = "### t-SNE Embedding\n\n"\
                + "Training data | Test data\n"\
                + ":--:|:--:\n"\
-               + f"![t-SNE plot of epoch {epoch} training data](./val_{epoch}/embeddings/tSNE_epoch_{epoch}_train.png)|"\
-               + f"![t-SNE plot of epoch {epoch} test data](./val_{epoch}/embeddings/tSNE_epoch_{epoch}_test.png)\n\n"
+               + f"![t-SNE plot of epoch {epoch} training data](./{val_folder}/embeddings/tSNE_epoch_{epoch}_train.png)|"\
+               + f"![t-SNE plot of epoch {epoch} test data](./{val_folder}/embeddings/tSNE_epoch_{epoch}_test.png)\n\n"
 
     insert_into_run_md(path, head, lines, inset_idx, text_entry, head_idx, head_entry)
 
 
-def add_class_to_run_md(path_class, best_acc):
+def add_class_to_run_md(path_class, best_acc, md_file=None):
     """Adds plots of classifier train loss and val acc of a specific epoch to the run.md file"""
     path = path_class.split('/')
-    epoch = path[-3].replace("val_", '')
+    epoch = path[-3].split('_')[-1]
     path_plots = os.path.join(*path[-3:], "tensorboard")
-    path = os.path.join(*path[:-3])
+    if md_file == None:
+        path = os.path.join(*path[:-3])
+    else:
+        path = os.path.join(*path[:-3], md_file)
     head, lines = open_run_md(path)
 
     head_entry = f"class{epoch}"
     if head_entry in head:
-        print(f"The classification info for epoch {epoch} is already in {os.path.join(path, 'run.md')}.")
+        print(f"The classification info for epoch {epoch} is already in {set_path_md(path)}.")
         return
     
     if f"{epoch}" not in head:
@@ -345,7 +381,7 @@ def add_class_CE_to_run_md(path, best_acc):
 
     head_entry = "classlast"
     if head_entry in head:
-        print(f"The classification info is already in {os.path.join(path, 'run.md')}.")
+        print(f"The classification info is already in {set_path_md(path)}.")
         return
     
     inset_idx, head_idx = get_insert_line("class", head)
@@ -360,17 +396,20 @@ def add_class_CE_to_run_md(path, best_acc):
     insert_into_run_md(path, head, lines, inset_idx, text_entry, head_idx, head_entry)
 
 
-def add_confusion_matrix_to_run_md(path_class, acc, acc_b):
+def add_confusion_matrix_to_run_md(path_class, acc, acc_b, train_acc, train_acc_b, md_file=None):
     """Adds plots of the confusion matrix for training and test data to the run.md file"""
     path = path_class.split('/')
-    epoch = path[-3].replace("val_", '')
+    epoch = path[-3].split('_')[-1]
     path_plots = os.path.join(*path[-3:], "models")
-    path = os.path.join(*path[:-3])
+    if md_file == None:
+        path = os.path.join(*path[:-3])
+    else:
+        path = os.path.join(*path[:-3], md_file)
     head, lines = open_run_md(path)
 
     head_entry = f"cm{epoch}"
     if head_entry in head:
-        print(f"The confusion matrix plots for epoch {epoch} are already in {os.path.join(path, 'run.md')}.")
+        print(f"The confusion matrix plots for epoch {epoch} are already in {set_path_md(path)}.")
         return
     
     if f"{epoch}" not in head:
@@ -380,10 +419,10 @@ def add_confusion_matrix_to_run_md(path_class, acc, acc_b):
     inset_idx, head_idx = get_insert_line("cm", head, epoch)
 
     text_entry = "#### Confusion Matrix\n\n"\
-               + f"**Accuracy: {acc:.2f}, Balanced Accuracy: {acc_b:.2f}**\n"\
+               + f"**Accuracy: {acc:.2f} (train: {train_acc:.2f}), Balanced Accuracy: {acc_b:.2f} (train: {train_acc_b:.2f})**\n"\
                + "Training | Test\n"\
                + ":--:|:--:\n"\
-               + f"![plot of classifier training loss]({os.path.join(path_plots, f'cm_train_epoch_{epoch}.png')})|"\
-               + f"![plot of classifier top-1 validation acc]({os.path.join(path_plots, f'cm_val_epoch_{epoch}.png')})\n\n"
+               + f"![plot of confusion matrix trainings data]({os.path.join(path_plots, f'cm_train_epoch_{epoch}.png')})|"\
+               + f"![plot of confusion matrix test data]({os.path.join(path_plots, f'cm_val_epoch_{epoch}.png')})\n\n"
     
     insert_into_run_md(path, head, lines, inset_idx, text_entry, head_idx, head_entry)

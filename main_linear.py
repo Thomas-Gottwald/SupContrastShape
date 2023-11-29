@@ -82,6 +82,8 @@ def parse_option():
                         help='path to pre-trained model')
     parser.add_argument('--pre_comp_feat', action='store_true',
                         help='Use pre computed feature embedding')
+    parser.add_argument('--md_file', type=str, default=None,
+                        help='Name of the markdown file to write the results. Use only for different than training datasets!')
 
     # optional identifier tag
     parser.add_argument('--tag', type=str, default='')
@@ -375,7 +377,7 @@ def main():
 
     # add classifier training details to the run.md file
     create_classifier_training_plots(path_class=os.path.join(opt.model_path, opt.model_name))
-    add_class_to_run_md(path_class=os.path.join(opt.model_path, opt.model_name), best_acc=best_acc)
+    add_class_to_run_md(path_class=os.path.join(opt.model_path, opt.model_name), best_acc=best_acc, md_file=opt.md_file)
 
 
 if __name__ == '__main__':
