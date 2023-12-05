@@ -192,6 +192,10 @@ def create_val_md(path_val_md, dataset_val):
     dataset_val: str
         name of the dataset used for validation
     """
+    if os.path.exists(path_val_md):
+        print(f"validation md file already exits: {path_val_md}")
+        return
+
     lines = [
                 "<!-- val -->\n",
                 f"# Validation with {dataset_val}\n\n"
@@ -229,7 +233,6 @@ def get_insert_line(entry, head, epoch="last"):
     lines_dict = {"param": 22, "tb": 6, "train": 6, "val": 2, "epoch": 2, "tsne": 6, "class": 7, "cm": 7}
     re_pattern = {"param": "param", "tb": "tb", "train": "train", "val": "val", "epoch": "last|[0-9]+", "tsne": "tsne(last|[0-9]+)", "class": "class(last|[0-9]+)", "cm": "cm(last|[0-9]+)"}
     entry_dict = {"train": (2,""), "val": (3,""), "epoch": (8,""), "tsne": (8,"last|[0-9]+"), "class": (8,"(tsne)?(last|[0-9]+)"), "cm": (8,"(tsne|class)?(last|[0-9]+)")}
-    # entry_dict = {"train": (2,""), "val": (3,""), "epoch": (7,""), "tsne": (7,"last|[0-9]+"), "class": (7,"(tsne)?(last|[0-9]+)"), "cm": (7,"(tsne|class)?(last|[0-9]+)")}
 
     num_head, re_check = entry_dict[entry]
     new_epoch = f"{epoch}"
@@ -240,7 +243,7 @@ def get_insert_line(entry, head, epoch="last"):
         for n in list(lines_dict)[:num_head]:
             if re.fullmatch(re_pattern[n], h):
 
-                if n in ["epoch", "tsne", "class"]:
+                if n in ["epoch", "tsne", "class", "cm"]:
                     check = re.fullmatch(re_check, h)
                     numbers = re.search("[0-9]+", h)
                     if new_epoch != "last" and numbers:
