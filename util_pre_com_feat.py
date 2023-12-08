@@ -3,8 +3,6 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
 
-from networks.resnet_big import SupConResNet, LinearClassifier
-
 class featureEmbeddingDataset(Dataset):
 
     def __init__(self, root):
@@ -59,65 +57,3 @@ def set_feature_loader(opt):
         num_workers=opt.num_workers_val, pin_memory=True)
     
     return train_loader, val_loader
-
-
-
-def main():
-    # Testing
-
-    train_dataset = featureEmbeddingDataset("./save/embeddings/animals10/resnet18/embedding_train")
-
-    train_sampler = None
-    train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=4, shuffle=(train_sampler is None),
-        num_workers=8, pin_memory=True, sampler=train_sampler)
-
-    model = IdentityWrapperNet()
-
-    classifier = LinearClassifier(name="resnet18", num_classes=10)
-
-    print(torch.cuda.is_available())
-    model = model.cuda(device=2)
-    classifier = classifier.cuda(device=2)
-
-    model.eval()
-    classifier.eval()
-    with torch.no_grad():
-        for idx, (images, labels) in enumerate(train_loader):
-
-            images = images.float().cuda(device=2)
-            print(images.get_device())
-
-            features = model.encoder(images)
-            print(labels)
-            print(features.shape, features.get_device())
-
-            output = classifier(features)
-
-            print(output.shape, output.get_device())
-
-            break
-
-
-    # model.eval()
-    # classifier.train()
-    # for idx, (images, labels) in enumerate(train_loader):
-
-    #     images = images.cuda(device=2, non_blocking=True)
-    #     print(images.get_device())
-        
-    #     with torch.no_grad():
-    #         features = model.encoder(images)
-    #     print(labels)
-    #     print(features.shape, features.get_device())
-
-    #     output = classifier(features.detach())
-
-    #     print(output.shape, output.get_device())
-
-    #     break
-
-
-
-if __name__ == '__main__':
-    main()
