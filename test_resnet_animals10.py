@@ -3,7 +3,7 @@ import torch
 import torch.backends.cudnn as cudnn
 from torchvision import transforms, datasets
 
-from util import TwoCropTransform
+from util.util import TwoCropTransform
 from networks.resnet_big import SupConResNet
 from losses import SupConLoss
 

@@ -11,12 +11,12 @@ import torch
 import torch.backends.cudnn as cudnn
 from torchvision import transforms, datasets
 
-from util import AverageMeter
-from util import adjust_learning_rate, warmup_learning_rate, accuracy
-from util import set_optimizer, save_model
+from util.util import AverageMeter
+from util.util import adjust_learning_rate, warmup_learning_rate, accuracy
+from util.util import set_optimizer, save_model
 from networks.resnet_big import SupCEResNet
-from util_logging import create_run_md, create_crossentropy_plots
-from util_logging import add_train_to_run_md, add_class_CE_to_run_md
+from util.util_logging import create_run_md, create_crossentropy_plots
+from util.util_logging import add_train_to_run_md, add_class_CE_to_run_md
 
 
 def parse_option():

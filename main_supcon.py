@@ -11,14 +11,14 @@ import torch
 import torch.backends.cudnn as cudnn
 from torchvision import transforms, datasets
 
-from util import TwoCropTransform, AverageMeter
-from util import adjust_learning_rate, warmup_learning_rate
-from util import set_optimizer, save_model
+from util.util import TwoCropTransform, AverageMeter
+from util.util import adjust_learning_rate, warmup_learning_rate
+from util.util import set_optimizer, save_model
 from networks.resnet_big import SupConResNet
 from losses import SupConLoss
-from util_diff import DiffLoader, DiffTransform
-from util_diff import SameTwoRandomResizedCrop, SameTwoColorJitter, SameTwoApply
-from util_logging import create_run_md, create_training_plots, add_train_to_run_md
+from util.util_diff import DiffLoader, DiffTransform
+from util.util_diff import SameTwoRandomResizedCrop, SameTwoColorJitter, SameTwoApply
+from util.util_logging import create_run_md, create_training_plots, add_train_to_run_md
 
 
 def parse_option():
