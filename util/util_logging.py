@@ -1,11 +1,19 @@
 import os
 import glob
 import re
+import numpy as np
 import pandas as pd
 import seaborn
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 
 seaborn.set_theme(style="darkgrid")
+
+
+def try_eval(val):
+    try:
+        return eval(val)
+    except:
+        return val
 
 
 # Convert teonsorboard logs into plots
@@ -429,3 +437,55 @@ def add_confusion_matrix_to_run_md(path_class, acc, acc_b, train_acc, train_acc_
                + f"![plot of confusion matrix test data]({os.path.join(path_plots, f'cm_val_epoch_{epoch}.png')})\n\n"
     
     insert_into_run_md(path, head, lines, inset_idx, text_entry, head_idx, head_entry)
+
+
+# comb mark down file
+def create_comb_md(path_comb_md, path_save, dataset_1, dataset_2, all_epochs, comb_dict):
+    with open(path_comb_md, "w") as f:
+        f.write(f"# Validation with {dataset_1} and {dataset_2}\n\n")
+
+    # bring the epochs in ascending order with 'last' in first place
+    all_epochs_list = np.array(list(all_epochs))
+    epochs_idx = np.argsort([int(e) if type(try_eval(e)) is int else -1 for e in all_epochs_list])
+    all_epochs_list = all_epochs_list[epochs_idx]
+
+    for e in all_epochs_list:
+        text_entry = ""
+        if f"tSNE{e}" in comb_dict:
+            path_tsne, path_tsne_second = comb_dict[f"tSNE{e}"]
+            text_entry = text_entry\
+                    + "### t-SNE Embedding\n\n"\
+                    + f"{dataset_1} Trainings data | {dataset_1} Test data\n"\
+                    + ":--:|:--:\n"\
+                    + f"![t-SNE plot of epoch {e} training data]({path_tsne[0].replace(path_save, '.')})|![t-SNE plot of epoch {e} test data]({path_tsne[1].replace(path_save, '.')})\n\n"\
+                    + f"{dataset_2} Trainings data | {dataset_2} Test data\n"\
+                    + ":--:|:--:\n"\
+                    + f"![t-SNE plot of epoch {e} training data]({path_tsne_second[0].replace(path_save, '.')})|![t-SNE plot of epoch {e} test data]({path_tsne_second[1].replace(path_save, '.')})\n\n"
+
+        if f"cm{e}" in comb_dict and f"acc{e}" in comb_dict:
+            acc11, acc12, acc22, acc21 = comb_dict[f"acc{e}"]
+            path_cm, path_cm_comb, path_cm_second, path_cm_comb_second = comb_dict[f"cm{e}"]
+            text_entry = text_entry\
+                    + f"### Classifier trained with {dataset_1} Trainings data\n\n"\
+                    + f"**[{dataset_1}]: Accuracy: {acc11[2]:.2f} (train: {acc11[0]:.2f}), Balanced Accuracy: {acc11[3]:.2f} (train: {acc11[1]:.2f})**\n"\
+                    + f"{dataset_1} Trainings data | {dataset_1} Test data\n"\
+                    + ":--:|:--:\n"\
+                    + f"![plot of confusion matrix trainings data]({path_cm[0].replace(path_save, '.')})|![plot of confusion matrix test data]({path_cm[1].replace(path_save, '.')})\n\n"\
+                    + f"**[{dataset_2}]: Accuracy: {acc12[2]:.2f} (train: {acc12[0]:.2f}), Balanced Accuracy: {acc12[3]:.2f} (train: {acc12[1]:.2f})**\n"\
+                    + f"{dataset_2} Trainings data | {dataset_2} Test data\n"\
+                    + ":--:|:--:\n"\
+                    + f"![plot of confusion matrix trainings data]({path_cm_comb[0].replace(path_save, '.')})|![plot of confusion matrix test data]({path_cm_comb[1].replace(path_save, '.')})\n\n"\
+                    + f"### Classifier trained with {dataset_2} Trainings data\n\n"\
+                    + f"**[{dataset_2}]: Accuracy: {acc22[2]:.2f} (train: {acc22[0]:.2f}), Balanced Accuracy: {acc22[3]:.2f} (train: {acc22[1]:.2f})**\n"\
+                    + f"{dataset_2} Trainings data | {dataset_2} Test data\n"\
+                    + ":--:|:--:\n"\
+                    + f"![plot of confusion matrix trainings data]({path_cm_second[0].replace(path_save, '.')})|![plot of confusion matrix test data]({path_cm_second[1].replace(path_save, '.')})\n\n"\
+                    + f"**[{dataset_1}]: Accuracy: {acc21[2]:.2f} (train: {acc21[0]:.2f}), Balanced Accuracy: {acc21[3]:.2f} (train: {acc21[1]:.2f})**\n"\
+                    + f"{dataset_1} Trainings data | {dataset_1} Test data\n"\
+                    + ":--:|:--:\n"\
+                    + f"![plot of confusion matrix trainings data]({path_cm_comb_second[0].replace(path_save, '.')})|![plot of confusion matrix test data]({path_cm_comb_second[1].replace(path_save, '.')})\n\n"\
+
+        if text_entry != "":
+            text_entry = f"## Epoch {e}\n\n" + text_entry
+        with open(path_comb_md, 'a') as f:
+            f.write(text_entry)
