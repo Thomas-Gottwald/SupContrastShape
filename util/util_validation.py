@@ -230,7 +230,7 @@ def set_dataloader(dataset, params, root_train_1, root_test_1, root_train_2=None
 
 
 def set_model(root_model, params, val_loader, cuda_device):
-    if params['method'] == "SupCE":
+    if 'method' not in params:
         model = SupCEResNet(name=params['model'], num_classes=len(val_loader.dataset.classes))
     else:
         model = SupConResNet(name=params['model'])
@@ -656,7 +656,7 @@ def get_comb_results(root_model, dataset_1, dataset_2, path_save, path_comb, pat
         if folder_e_1 in all_val_folders and folder_e_2 in all_val_folders:
 
             # get the plots of the t-SNE embeddings
-            path_embeddings_e_1 = path_embeddings_1.replace(folder_epoch_1, folder_e_2)
+            path_embeddings_e_1 = path_embeddings_1.replace(folder_epoch_1, folder_e_1)
             path_embeddings_e_2 = path_embeddings_2.replace(folder_epoch_2, folder_e_2)
             tSNE_plots_1 = glob.glob(os.path.join(path_embeddings_e_1, "*.png"))
             tSNE_plots_2= glob.glob(os.path.join(path_embeddings_e_2, "*.png"))
