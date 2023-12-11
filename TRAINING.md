@@ -105,6 +105,26 @@ CUDA_VISIBLE_DEVICES=1 nohup python main_ce.py --dataset animals10_diff_-1+4000 
 CUDA_VISIBLE_DEVICES=0 nohup python main_ce.py --dataset untrained --data_folder ./datasets/animals10_diff/-1/train/ --test_folder ./datasets/animals10_diff/-1/test/ --num_classes 10 --learning_rate 0 --model resnet18 --epochs 0 --size 300 --batch_size 26 --batch_size_val 26 --mean "(0.3837, 0.3704, 0.3072)" --std "(0.3268, 0.3187, 0.3051)" --tag noTraining > supCE_noTraining.out
 ```
 
+# Training on smaller Datasets
+
+## Cross Entropy Learning with animals10_small
+
+**Resnet18, batchsize: 26, learning rate: 0.125, epochs: 1000**
+
+Training:
+```
+CUDA_VISIBLE_DEVICES=1 nohup python main_ce.py --dataset animals10_diff_-1_small --data_folder ./datasets/animals10_diff/-1/train_small/ --test_folder ./datasets/animals10_diff/-1/test/ --num_classes 10 --learning_rate 0.125 --cosine --model resnet18 --epochs 1000 --size 300 --batch_size 26 --batch_size_val 26 --mean "(0.3708, 0.3579, 0.2948)" --std "(0.3253, 0.3171, 0.3019)" --tag origSmall > supCE_origSmall.out &
+```
+
+## Cross Entropy Learning with animals10_diff_small
+
+**Resnet18, batchsize: 26, learning rate: 0.125, epochs: 1000**
+
+Training:
+```
+CUDA_VISIBLE_DEVICES=1 nohup python main_ce.py --dataset animals10_diff_4000_small --data_folder ./datasets/animals10_diff/4000/train_small/ --test_folder ./datasets/animals10_diff/4000/test/ --num_classes 10 --learning_rate 0.125 --cosine --model resnet18 --epochs 1000 --size 300 --batch_size 26 --batch_size_val 26 --mean "(0.3749, 0.3618, 0.2974)" --std "(0.3233, 0.3148, 0.2992)" --tag 4000Small > supCE_4000Small.out &
+```
+
 # Adjusting Learning Rate
 
 ## Supervised Contrastive Learning with animals10_300x300
