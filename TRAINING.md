@@ -34,9 +34,16 @@ Contrastive training:
 CUDA_VISIBLE_DEVICES=2 nohup python main_supcon.py --dataset animals10 --data_folder ./datasets/animals10_300x300/train/ --learning_rate 0.5 --temp 0.1 --cosine --model resnet18 --epochs 300 --size 300 --batch_size 26 --method SupCon --mean "(0.3837, 0.3704, 0.3072)" --std "(0.3268, 0.3187, 0.3051)" --tag try2 > supCon_try2.out &
 ```
 
+**Resnet18, batchsize: 26, learning rate 0.125, epochs: 300 (3nd try)**
+
+Contrastive training:
+```
+CUDA_VISIBLE_DEVICES=2 nohup python main_supcon.py --dataset animals10_diff_-1 --data_folder ./datasets/animals10_diff/-1/train/ --learning_rate 0.125 --temp 0.1 --cosine --model resnet18 --epochs 300 --size 300 --batch_size 26 --method SupCon --mean "(0.3816, 0.3683, 0.3052)" --std "(0.3281, 0.3198, 0.3055)" --tag try3 > supCon_try3.out &
+```
+
 ## Cross Entropy Learning with animals10_300x300
 
-**Resnet18, batchsize: 26, leaning rate: 0.125, epochs: 500**
+**Resnet18, batchsize: 26, learning rate: 0.125, epochs: 500**
 
 Training:
 ```
@@ -45,14 +52,14 @@ CUDA_VISIBLE_DEVICES=2 nohup python main_ce.py --dataset animals10 --data_folder
 
 ## Hybride Contrastive Learning with animals10_diff
 
-**Resnet18, batchsize: 26, leaning rate: 0.125, epochs: 300, no Augmentations**
+**Resnet18, batchsize: 26, learning rate: 0.125, epochs: 300, no Augmentations**
 
 Contrastive training:
 ```
 CUDA_VISIBLE_DEVICES=2 nohup python main_supcon.py --dataset animals10_diff_-1+4000 --data_folder ./datasets/animals10_diff/-1/train/ --diff_folder ./datasets/animals10_diff/4000/train/ --aug --learning_rate 0.125 --temp 0.1 --cosine --model resnet18 --epochs 300 --size 300 --batch_size 26 --method SupConHybrid --mean "(0.3816, 0.3683, 0.3052)" --std "(0.3281, 0.3198, 0.3055)" --tag noAug > supConHybrid_noAug.out &
 ```
 
-**Resnet18, batchsize: 26, leaning rate: 0.125, epochs: 300, color Augmentations**
+**Resnet18, batchsize: 26, learning rate: 0.125, epochs: 300, color Augmentations**
 
 Contrastive training:
 ```
@@ -61,14 +68,14 @@ CUDA_VISIBLE_DEVICES=1 nohup python main_supcon.py --dataset animals10_diff_-1+4
 
 ## Supervised Contrastive Learning with animals10_diff
 
-**Resnet18, batchsize: 26, leaning rate: 0.125, epochs: 300, no Augmentations**
+**Resnet18, batchsize: 26, learning rate: 0.125, epochs: 300, no Augmentations**
 
 Contrastive training:
 ```
 CUDA_VISIBLE_DEVICES=2 nohup python main_supcon.py --dataset animals10_diff_-1+4000 --data_folder ./datasets/animals10_diff/-1/train/ --diff_folder ./datasets/animals10_diff/4000/train/ --aug --learning_rate 0.125 --temp 0.1 --cosine --model resnet18 --epochs 300 --size 300 --batch_size 26 --method SupCon --mean "(0.3816, 0.3683, 0.3052)" --std "(0.3281, 0.3198, 0.3055)" --tag noAug > supCon_noAug.out &
 ```
 
-<!-- **Resnet18, batchsize: 26, leaning rate: 0.125, epochs: 300, color Augmentations**
+<!-- **Resnet18, batchsize: 26, learning rate: 0.125, epochs: 300, color Augmentations**
 
 Contrastive training:
 ```
@@ -77,11 +84,18 @@ CUDA_VISIBLE_DEVICES=2 nohup python main_supcon.py --dataset animals10_diff_-1+4
 
 ## Cross Entropy Learning with animals10_diff
 
-**Resnet18, batchsize: 26, leaning rate: 0.125, epochs: 500**
+**Resnet18, batchsize: 26, learning rate: 0.125, epochs: 500**
 
 Training:
 ```
 CUDA_VISIBLE_DEVICES=1 nohup python main_ce.py --dataset animals10_diff_4000 --data_folder ./datasets/animals10_diff/4000/train/ --test_folder ./datasets/animals10_diff/4000/test/ --num_classes 10 --learning_rate 0.125 --cosine --model resnet18 --epochs 500 --size 300 --batch_size 26 --batch_size_val 26 --mean "(0.3869, 0.3732, 0.3088)" --std "(0.3273, 0.3186, 0.3039)" --tag 4000 > supCE_4000.out &
+```
+
+**Resnet18, batchsize: 26, learning rate: 0.125, epochs: 500, use diffused images as augmentation**
+
+Training:
+```
+CUDA_VISIBLE_DEVICES=1 nohup python main_ce.py --dataset animals10_diff_-1+4000 --data_folder ./datasets/animals10_diff/-1/train/ --diff_folder ./datasets/animals10_diff/4000/train/ --test_folder ./datasets/animals10_diff/-1/test/ --num_classes 10 --learning_rate 0.125 --cosine --model resnet18 --epochs 500 --size 300 --batch_size 26 --batch_size_val 26 --mean "(0.3816, 0.3683, 0.3052)" --std "(0.3281, 0.3198, 0.3055)" --tag diffAug > supCE_diffAug.out &
 ```
 
 ## No Training Baseline
@@ -95,14 +109,14 @@ CUDA_VISIBLE_DEVICES=0 nohup python main_ce.py --dataset untrained --data_folder
 
 ## Supervised Contrastive Learning with animals10_300x300
 
-**Resnet18, batchsize: 26, leaning rate: 0.25**
+**Resnet18, batchsize: 26, learning rate: 0.25**
 
 Contrastive training:
 ```
 CUDA_VISIBLE_DEVICES=1 nohup python main_supcon.py --dataset animals10 --data_folder ./datasets/animals10_300x300/train/ --learning_rate 0.25 --temp 0.1 --model resnet18 --epochs 10 --size 300 --batch_size 26 --method SupCon --mean "(0.3837, 0.3704, 0.3072)" --std "(0.3268, 0.3187, 0.3051)" --tag lrAdjust1 > supCon_lrAdjust1.out &
 ```
 
-**Resnet18, batchsize: 26, leaning rate: 0.125**
+**Resnet18, batchsize: 26, learning rate: 0.125**
 
 Contrastive training:
 ```
@@ -111,14 +125,14 @@ CUDA_VISIBLE_DEVICES=1 nohup python main_supcon.py --dataset animals10 --data_fo
 
 ## Cross Entropy Learning with animals10_300x300
 
-**Resnet18, batchsize: 26, leaning rate: 0.25**
+**Resnet18, batchsize: 26, learning rate: 0.25**
 
 Training:
 ```
 CUDA_VISIBLE_DEVICES=2 nohup python main_ce.py --dataset animals10 --data_folder ./datasets/animals10_300x300/train/ --test_folder ./datasets/animals10_300x300/test/ --num_classes 10 --learning_rate 0.25 --model resnet18 --epochs 10 --size 300 --batch_size 26 --batch_size_val 26 --mean "(0.3837, 0.3704, 0.3072)" --std "(0.3268, 0.3187, 0.3051)" --tag lrAdjust1 > supCE_lrAdjust1.out &
 ```
 
-**Resnet18, batchsize: 26, leaning rate: 0.125**
+**Resnet18, batchsize: 26, learning rate: 0.125**
 
 Training:
 ```
@@ -127,7 +141,7 @@ CUDA_VISIBLE_DEVICES=2 nohup python main_ce.py --dataset animals10 --data_folder
 
 # Adjusting Batch Size
 
-**Resnet18, batchsize: 52, leaning rate: 0.125**
+**Resnet18, batchsize: 52, learning rate: 0.125**
 
 Training:
 ```

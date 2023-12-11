@@ -58,6 +58,8 @@ def parse_option():
     parser.add_argument('--test_folder', type=str, default=None, help='path to custom dataset validation data')
     parser.add_argument('--size', type=int, default=32, help='parameter for RandomResizedCrop')
     parser.add_argument('--num_classes', type=int, default=None, help='number of classes in the custom dataset')
+    parser.add_argument('--diff_folder', type=str, default=None, help='path to diffused dataset. When given for training an original image gets replaced with its diffused version with p=diff_p.')
+    parser.add_argument('--diff_p', default=0.5, type=float, help='probability to select diffused image if diff_folder is given')
 
     # augmentation
     parser.add_argument('--aug', nargs='*', default=['resizedCrop', 'horizontalFlip'],

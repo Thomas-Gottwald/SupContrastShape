@@ -15,6 +15,7 @@ from util.util import AverageMeter
 from util.util import adjust_learning_rate, warmup_learning_rate, accuracy
 from util.util import set_optimizer, save_model
 from networks.resnet_big import SupCEResNet
+from util.util_diff import DiffLoader, SelectTransform
 from util.util_logging import create_run_md, create_crossentropy_plots
 from util.util_logging import add_train_to_run_md, add_class_CE_to_run_md
 
@@ -58,6 +59,8 @@ def parse_option():
     parser.add_argument('--test_folder', type=str, default=None, help='path to custom dataset validation data')
     parser.add_argument('--size', type=int, default=32, help='parameter for RandomResizedCrop')
     parser.add_argument('--num_classes', type=int, default=None, help='number of classes in the custom dataset')
+    parser.add_argument('--diff_folder', type=str, default=None, help='path to diffused dataset. When given for training an original image gets replaced with its diffused version with p=diff_p.')
+    parser.add_argument('--diff_p', default=0.5, type=float, help='probability to select diffused image if diff_folder is given')
 
     # augmentation
     parser.add_argument('--aug', nargs='*', default=['resizedCrop', 'horizontalFlip'],
@@ -170,13 +173,10 @@ def set_loader(opt):
         std = eval(opt.std)
     normalize = transforms.Normalize(mean=mean, std=std)
 
-    train_transform = transforms.Compose([
-        transforms.RandomResizedCrop(size=opt.size, scale=(0.2, 1.)),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        normalize,
-    ])
     transform_list = []
+    if opt.diff_folder:
+        # if diff_folder is given original and diffused images get loaded and SelectTransform than selects one at random
+        transform_list.append(SelectTransform(p=opt.diff_p))
     if 'resizedCrop' in opt.aug:
         scaleMin, scaleMax, ratioMin, ratioMax = opt.resizedCrop
         transform_list.append(transforms.RandomResizedCrop(size=opt.size, scale=(scaleMin, scaleMax), ratio=(ratioMin, ratioMax)))
@@ -215,11 +215,16 @@ def set_loader(opt):
                                         train=False,
                                         transform=val_transform)
     else:
-        train_dataset = datasets.ImageFolder(root=opt.data_folder,
-                                            transform=train_transform)
+        if opt.diff_folder:
+            train_dataset = datasets.ImageFolder(root=opt.data_folder,
+                                                 loader=DiffLoader(path_orig=opt.data_folder, path_diff=opt.diff_folder),
+                                                 transform=train_transform)
+        else:
+            train_dataset = datasets.ImageFolder(root=opt.data_folder,
+                                                 transform=train_transform)
         
         val_dataset = datasets.ImageFolder(root=opt.test_folder,
-                                            transform=val_transform)
+                                           transform=val_transform)
 
     train_sampler = None
     train_loader = torch.utils.data.DataLoader(

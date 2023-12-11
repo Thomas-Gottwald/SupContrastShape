@@ -1,3 +1,4 @@
+import torch
 from torchvision import transforms, datasets
 
 
@@ -79,6 +80,20 @@ class DiffTransform:
         else:
             x_orig, x_diff = x
         return [self.transform(x_orig), self.transform(x_diff)]
+    
+
+class SelectTransform:
+    """Selects random one of the coupled images"""
+    def __init__(self, p=0.5):
+        self.p = p
+
+    def __call__(self, x):
+        x_orig, x_diff = x
+
+        if torch.rand(1).item() >= self.p:
+            return x_orig
+        else:
+            return x_diff
     
 
 class DiffLoader:
