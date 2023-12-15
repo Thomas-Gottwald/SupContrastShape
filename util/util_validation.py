@@ -15,9 +15,9 @@ from torchvision import transforms, datasets
 from tqdm import tqdm
 from PIL import Image
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from torch.utils.data import Dataset
 
 from networks.resnet_big import SupCEResNet, SupConResNet, LinearClassifier, model_dict
-
 from util.util_diff import DiffLoader, DiffTransform
 from util.util_diff import SameTwoRandomResizedCrop, SameTwoColorJitter, SameTwoApply
 from util.util_logging import add_tsne_to_run_md, create_val_md
@@ -59,40 +59,43 @@ def get_classes(dataset):
         return None
 
 
-def get_paths_to_embeddings_and_run_md(root_model, dataset_1, dataset_2=None):
+def get_paths_to_embeddings_and_run_md(root_model, dataset_1=None, dataset_2=None):
     split_model = root_model.split('/')
 
     epoch = split_model[-1].replace(".pth", '').split('_')[-1]
 
-    training_dataset = split_model[-4]
-
     path_save = os.path.join(*split_model[:-2])
     path_run_md = os.path.join(path_save, "run.md")
-    if dataset_1 == training_dataset:
-        path_val_md_1 = path_run_md
-        path_embeddings_1 = os.path.join(path_save, f"val_{epoch}", "embeddings")
-    else:
-        path_val_md_1 = os.path.join(path_save, f"val_{dataset_1}.md")
-        path_embeddings_1 = os.path.join(path_save, f"val_{dataset_1}_{epoch}", "embeddings")
 
-    if dataset_2:
-        if dataset_2 == training_dataset:
-            path_val_md_2 = path_run_md
-            path_embeddings_2 = os.path.join(path_save, f"val_{epoch}", "embeddings")
+    if dataset_1:
+        training_dataset = split_model[-4]
+        if dataset_1 == training_dataset:
+            path_val_md_1 = path_run_md
+            path_embeddings_1 = os.path.join(path_save, f"val_{epoch}", "embeddings")
         else:
-            path_val_md_2 = os.path.join(path_save, f"val_{dataset_2}.md")
-            path_embeddings_2 = os.path.join(path_save, f"val_{dataset_2}_{epoch}", "embeddings")
+            path_val_md_1 = os.path.join(path_save, f"val_{dataset_1}.md")
+            path_embeddings_1 = os.path.join(path_save, f"val_{dataset_1}_{epoch}", "embeddings")
 
-        if dataset_1 < dataset_2:
-            path_comb_md = os.path.join(*split_model[:-2], f"comb_{dataset_1}_{dataset_2}.md")
-            path_comb = os.path.join(*split_model[:-2], f"comb_{dataset_1}_{dataset_2}")
+        if dataset_2:
+            if dataset_2 == training_dataset:
+                path_val_md_2 = path_run_md
+                path_embeddings_2 = os.path.join(path_save, f"val_{epoch}", "embeddings")
+            else:
+                path_val_md_2 = os.path.join(path_save, f"val_{dataset_2}.md")
+                path_embeddings_2 = os.path.join(path_save, f"val_{dataset_2}_{epoch}", "embeddings")
+
+            if dataset_1 < dataset_2:
+                path_comb_md = os.path.join(*split_model[:-2], f"comb_{dataset_1}_{dataset_2}.md")
+                path_comb = os.path.join(*split_model[:-2], f"comb_{dataset_1}_{dataset_2}")
+            else:
+                path_comb_md = os.path.join(*split_model[:-2], f"comb_{dataset_2}_{dataset_1}.md")
+                path_comb = os.path.join(*split_model[:-2], f"comb_{dataset_2}_{dataset_1}")
+
+            return path_save, path_run_md, path_val_md_1, path_val_md_2, path_comb_md, path_comb, path_embeddings_1, path_embeddings_2, epoch
         else:
-            path_comb_md = os.path.join(*split_model[:-2], f"comb_{dataset_2}_{dataset_1}.md")
-            path_comb = os.path.join(*split_model[:-2], f"comb_{dataset_2}_{dataset_1}")
-
-        return path_save, path_run_md, path_val_md_1, path_val_md_2, path_comb_md, path_comb, path_embeddings_1, path_embeddings_2, epoch
+            return path_save, path_run_md, path_val_md_1, path_embeddings_1, epoch
     else:
-        return path_save, path_run_md, path_val_md_1, path_embeddings_1, epoch
+        return path_save, path_run_md, epoch
     
 
 def read_parameters_from_run_md(path_run_md):
@@ -229,9 +232,9 @@ def set_dataloader(dataset, params, root_train_1, root_test_1, root_train_2=None
     return train_loader, val_loader
 
 
-def set_model(root_model, params, val_loader, cuda_device):
+def set_model(root_model, params, num_classes, cuda_device):
     if 'method' not in params:
-        model = SupCEResNet(name=params['model'], num_classes=len(val_loader.dataset.classes))
+        model = SupCEResNet(name=params['model'], num_classes=num_classes)
     else:
         model = SupConResNet(name=params['model'])
 
@@ -429,6 +432,26 @@ def load_classifier_plots(path_classifier):
 
 
 # Confusion Matrix
+def load_classifier_checkpoint(path_classifier, model_name, num_classes, cuda_device=None):
+    classifier = LinearClassifier(name=model_name, num_classes=num_classes)
+
+    ckpt = torch.load(os.path.join(path_classifier, "models", "last.pth"), map_location='cpu')
+    state_dict = ckpt['model']
+
+    new_state_dict = {}
+    for k, v in state_dict.items():
+        k = k.replace("module.", "")
+        new_state_dict[k] = v
+    state_dict = new_state_dict
+
+    if cuda_device != None:
+        classifier = classifier.cuda(device=cuda_device)
+
+    classifier.load_state_dict(state_dict)
+
+    return classifier
+
+
 def set_up_classifier(path_classifier, path_embeddings, params, cuda_device):
     train_dataset = featureEmbeddingDataset(root=os.path.join(path_embeddings, 'embedding_train'))
 
@@ -441,20 +464,8 @@ def set_up_classifier(path_classifier, path_embeddings, params, cuda_device):
         val_dataset, batch_size=256, shuffle=False,
         num_workers=16, pin_memory=True)
 
-    classifier = LinearClassifier(name=params['model'], num_classes=len(set(val_dataset.targets)))
-
-    ckpt = torch.load(os.path.join(path_classifier, "models", "last.pth"), map_location='cpu')
-    state_dict = ckpt['model']
-
-    new_state_dict = {}
-    for k, v in state_dict.items():
-        k = k.replace("module.", "")
-        new_state_dict[k] = v
-    state_dict = new_state_dict
-
-    classifier = classifier.cuda(device=cuda_device)
-
-    classifier.load_state_dict(state_dict)
+    classifier = load_classifier_checkpoint(path_classifier=path_classifier, model_name=params["model"],
+                                            num_classes=len(set(val_dataset.targets)), cuda_device=cuda_device)
 
     return classifier, train_loader, val_loader
 
@@ -478,11 +489,11 @@ def get_predictions(classifier, data_loader, cuda_device):
     return pd.DataFrame.from_dict({"true_class": true_classes, "pred_class": pred_classes})
 
 
-def get_confusion_matrix(df_pred):
+def get_confusion_matrix(df_pred, true="true_class", pred="pred_class"):
     # confusion matrix
-    C = confusion_matrix(df_pred["true_class"], df_pred["pred_class"])
+    C = confusion_matrix(df_pred[true], df_pred[pred])
 
-    c_lens = df_pred.groupby('true_class').count().values.reshape(-1)
+    c_lens = df_pred[[true, pred]].groupby(true).count().values.reshape(-1)
 
     # accuracy
     acc = 0.0
@@ -534,6 +545,41 @@ def compute_and_save_confusion_matrix(root_model, dataset, path_embeddings, para
     
 
 # Distances between two Embeddings
+def compute_mean_distance(embedding_1, embedding_2, class_labels):
+    # related distances
+    distances_embeddings = 1-torch.nn.functional.cosine_similarity(torch.tensor(embedding_1), torch.tensor(embedding_2))
+    mean_distance = distances_embeddings.mean()
+
+    # in class distances
+    dist_mean_class_list = []
+    for l in tqdm(range(len(set(class_labels)))):
+        class_indices = np.where(class_labels == l)[0]
+
+        embedding_class_1 = embedding_1[class_indices]
+        embedding_class_2 = embedding_2[class_indices]
+
+        mean_dist_class = 0.0
+        for s in range(len(class_indices)):
+            distances_embeddings_class = 1-torch.nn.functional.cosine_similarity(torch.tensor(embedding_class_1), torch.tensor(embedding_class_2).roll(s, dims=0))
+            mean_dist_class += distances_embeddings_class.mean()
+        mean_dist_class /= len(class_indices)
+
+        dist_mean_class_list.append(mean_dist_class.item())
+
+    mean_distance_classes = np.mean(dist_mean_class_list)
+
+    # all versus all distances
+    mean_distances_all = 0.0
+
+    for s in tqdm(range(len(class_labels))):
+        distances_embeddings_roll = 1-torch.nn.functional.cosine_similarity(torch.tensor(embedding_1), torch.tensor(embedding_2).roll(s, dims=0))
+        mean_distances_all += distances_embeddings_roll.mean()
+
+    mean_distances_all /= len(class_labels)
+
+    return mean_distance, mean_distance_classes, mean_distances_all
+
+
 def plot_distances(dataset_1, dataset_2, embedding_train_1, embedding_train_2, class_labels_train, embedding_test_1, embedding_test_2, class_labels_test):
     fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(11,5))
     fig.tight_layout(w_pad=3)
@@ -732,3 +778,189 @@ def get_comb_results(root_model, dataset_1, dataset_2, path_save, path_comb, pat
         #     print("comb", e, comb_folder_e)
 
     return all_epochs, comb_dict
+
+
+# Shape Texture Conflict Validation
+class shapeTextureConflictDataset(Dataset):
+
+    def __init__(self, root, transform=None):
+        self.root = root
+        self.transform = transform
+
+        self.classes = [x[:-1].replace(root, '') for x in glob.glob(os.path.join(root, "*/"))]
+        self.paths = []
+        self.targets_shape = []
+        self.targets_texture = []
+
+        for ls, shape in enumerate(self.classes):
+            for lt, texture in enumerate(self.classes):
+                if ls != lt:
+                    s_t_paths = glob.glob(os.path.join(root, f"{shape}", f"{texture}", "*"))
+                    self.paths.extend(s_t_paths)
+                    self.targets_shape.extend(len(s_t_paths)*[ls])
+                    self.targets_texture.extend(len(s_t_paths)*[lt])
+
+    def __len__(self):
+        return len(self.paths)
+    
+    def __getitem__(self, index):
+        image = datasets.folder.default_loader(self.paths[index])
+        target = (self.targets_shape[index], self.targets_texture[index])
+
+        if self.transform:
+            image = self.transform(image)
+
+        return image, target
+
+
+def shape_texture_predictions(model, classifier, conflict_dataloader, cuda_device):
+    model.eval()
+    classifier.eval()
+
+    shape_classes = []
+    texture_classes = []
+    pred_classes = []
+
+    for images, labels in tqdm(conflict_dataloader):
+        images = images.cuda(device=cuda_device, non_blocking=True)
+
+        with torch.no_grad():
+            features = model.encoder(images)
+            output = classifier(features)
+            _, pred = output.topk(1, 1, True, True)
+
+        shape_classes.extend(labels[0].numpy())
+        texture_classes.extend(labels[1].numpy())
+        pred_classes.extend(pred.cpu().numpy().reshape(-1))
+
+    df_pred = pd.DataFrame.from_dict({"shape_class": shape_classes, "texture_class": texture_classes, "pred_class": pred_classes})
+
+    return df_pred
+
+
+def shape_texture_conflict_bias(df_pred, shape="shape_class", texture="texture_class", pred="pred_class"):
+    acc = len(df_pred.query(f"{shape} == {pred} or {texture} == {pred}")) / len(df_pred)
+    acc_shape = len(df_pred.query(f"{shape} == {pred}")) / len(df_pred)
+    acc_texture = len(df_pred.query(f"{texture} == {pred}")) / len(df_pred)
+
+    shape_bias = acc_shape / acc
+    
+    return shape_bias, acc, acc_shape, acc_texture
+
+
+def evaluate_shape_texture_conflict(models_dict, dataset_stConflict, cuda_device):
+    pred_dict = dict()
+
+    for m in models_dict:
+        root_model, dataset_classifier = models_dict[m]
+
+        root_split = get_paths_to_embeddings_and_run_md(root_model, dataset_classifier)
+        path_run_md = root_split[1]
+        params = read_parameters_from_run_md(path_run_md)
+        if dataset_classifier:
+            epoch = root_split[-1]
+            path_classifier = get_path_classifier(root_model, dataset_classifier, params, epoch)
+
+        normalize = transforms.Normalize(mean=params['mean'], std=params['std'])
+        val_transform = transforms.Compose([transforms.Resize(params['size']), transforms.CenterCrop(params['size']), transforms.ToTensor(), normalize])
+
+        conflict_dataset = shapeTextureConflictDataset(dataset_stConflict, val_transform)
+        classes = conflict_dataset.classes
+
+        conflict_dataloader = torch.utils.data.DataLoader(conflict_dataset, batch_size=params['batch_size'],
+                                                          shuffle=False, num_workers=8, pin_memory=True)
+        
+        model = set_model(root_model, params, len(classes), cuda_device)
+        if dataset_classifier:
+            classifier = load_classifier_checkpoint(path_classifier, params["model"], len(classes), cuda_device)
+        else:
+            classifier = model.fc
+
+        df_pred = shape_texture_predictions(model, classifier, conflict_dataloader, cuda_device)
+
+        pred_dict[m] = df_pred
+
+    return pred_dict, classes
+
+
+def compute_shape_biases(pred_dict, classes):
+    bias_dict = dict()
+    class_biasses = dict()
+
+    for m in pred_dict:
+        shape_bias, acc, acc_shape, acc_texture = shape_texture_conflict_bias(df_pred=pred_dict[m])
+        
+        bias_dict[m] = {"shape_bias": shape_bias, "acc": acc, "acc_shape": acc_shape, "acc_texture": acc_texture}
+
+        class_bias_dict = dict()
+        for l,c in enumerate(classes):
+            c_s_bias, c_acc, c_acc_shape, c_acc_texture = shape_texture_conflict_bias(pred_dict[m].query(f"shape_class == {l} or texture_class == {l}"))
+            class_bias_dict[c] = {"shape_bias": c_s_bias, "acc": c_acc, "acc_shape": c_acc_shape, "acc_texture": c_acc_texture}
+        class_biasses[m] = pd.DataFrame.from_dict(class_bias_dict)
+
+    df_bias = pd.DataFrame.from_dict(bias_dict)
+
+    return df_bias, class_biasses
+
+
+def plot_shape_texture_conflict_bias(class_biasses, df_bias, ax=None):
+    if not ax:
+        fig, ax = plt.subplots()
+
+    model_names = list(class_biasses.keys())
+    classes = class_biasses[model_names[0]].columns
+
+    yMin = -0.5
+    yMax = len(classes) - 0.5
+
+    for m in class_biasses:
+        ax.scatter(x=class_biasses[m].iloc[0].values, y=classes, label=f"{m} (shape bias: {df_bias[m]['shape_bias']:.2f})")
+    ax.vlines(df_bias.loc["shape_bias"].values, ymin=-0.5, ymax=9.5, colors=[plt.colormaps["tab10"](i) for i in range(len(model_names))])
+
+    ax.set_xlabel("shape bias")
+    ax.set_xticks(ticks=np.arange(start=0, stop=1.1, step=0.1))
+    ax.set_yticks(ticks=np.arange(len(classes)), labels=classes)
+    ax.set_xlim(0, 1)
+    ax.set_ylim(yMin, yMax)
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5,1.05 + len(model_names)*0.0625))
+    ax.set_title("Shape Bias", y=1.05 + len(model_names)*0.0625)
+
+
+def plot_class_accuracies(class_biasses, df_bias, ax=None):
+    if not ax:
+        fig, ax = plt.subplots()
+
+    model_names = list(class_biasses.keys())
+
+    df_class_acc =pd.DataFrame()
+    for m in class_biasses:
+        df_class_acc[m] = class_biasses[m].loc['acc']
+
+    df_class_acc.plot.barh(ax=ax)
+    ax.set_xlabel("accuracy")
+    ax.set_xlim(0, 1)
+    ax.legend([f"{m} (acc: {100*df_bias[m]['acc']:.2f}%)" for m in model_names], 
+              loc='upper center', bbox_to_anchor=(0.5,1.05 + len(class_biasses)*0.0625))
+    ax.set_title("Class Accuracies", y=1.05 + len(class_biasses)*0.0625)
+
+
+def plot_class_accuracies_stacked(class_biasses, ax=None):
+    if not ax:
+        fig, ax = plt.subplots()
+
+    model_names = list(class_biasses.keys())
+
+    df_class_acc = pd.DataFrame()
+    for m in class_biasses:
+        df_class_acc[f"{m}_acc_shape"] = class_biasses[m].loc['acc_shape']
+        df_class_acc[f"{m}_acc_texture"] = class_biasses[m].loc['acc_texture']
+
+    cmap = plt.colormaps["tab20"]
+    for i,m in enumerate(model_names):
+        df_class_acc[[f"{m}_acc_shape", f"{m}_acc_texture"]].plot.barh(stacked=True, ax=ax, position=i, width=0.8/len(model_names), color=[cmap(2*i), cmap(2*i+1)])
+
+    ax.set_xlabel("accuracy")
+    ax.set_xlim(0, 1)
+    ax.set_ylim(-1, len(df_class_acc) - 0.5)
+    ax.legend(ncols=2, loc='upper center', bbox_to_anchor=(0.5,1.05 + len(class_biasses)*0.0625))
+    ax.set_title("Class Accuracies", y=1.05 + len(class_biasses)*0.0625)
