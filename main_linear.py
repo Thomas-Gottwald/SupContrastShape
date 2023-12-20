@@ -364,6 +364,10 @@ def main():
 
         if val_acc > best_acc:
             best_acc = val_acc
+            # save the best classifier
+            save_best_file = os.path.join(
+                opt.save_folder, 'best.pth')
+            save_model(classifier, optimizer, opt, opt.epochs, save_best_file)
         if val_acc_top5 > best_acc_top5:
             best_acc_top5 = val_acc_top5
 

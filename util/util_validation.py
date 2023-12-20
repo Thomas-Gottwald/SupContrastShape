@@ -123,9 +123,9 @@ def read_parameters_from_run_md(path_run_md):
 def get_path_classifier(root_model, dataset, params, epoch):
     split_model = root_model.split('/')
     if dataset == params['dataset']:
-        path_classifier = glob.glob(os.path.join(*split_model[:-2], f"val_{epoch}", "classifier", "*/"))
+        path_classifier = glob.glob(os.path.join(*split_model[:-2], f"val_{epoch}", "classifier", f"{params['dataset']}*/"))
     else:
-        path_classifier = glob.glob(os.path.join(*split_model[:-2], f"val_{dataset}_{epoch}", "classifier", "*/"))
+        path_classifier = glob.glob(os.path.join(*split_model[:-2], f"val_{dataset}_{epoch}", "classifier", f"{params['dataset']}*/"))
     if len(path_classifier) > 0:
         path_classifier = (path_classifier[0])[:-1]
 
@@ -435,7 +435,10 @@ def load_classifier_plots(path_classifier):
 def load_classifier_checkpoint(path_classifier, model_name, num_classes, cuda_device=None):
     classifier = LinearClassifier(name=model_name, num_classes=num_classes)
 
-    ckpt = torch.load(os.path.join(path_classifier, "models", "last.pth"), map_location='cpu')
+    checkpoint = "last.pth"
+    # if os.path.isfile(os.path.join(path_classifier, "models", "best.pth")):# TODO incorporate best classification checkpoint
+    #     checkpoint = "best.pth"
+    ckpt = torch.load(os.path.join(path_classifier, "models", checkpoint), map_location='cpu')
     state_dict = ckpt['model']
 
     new_state_dict = {}
