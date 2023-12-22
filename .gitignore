@@ -1,5 +1,6 @@
 datasets/
 *.out
+zz_*
 
 tmp*.py
 .idea/

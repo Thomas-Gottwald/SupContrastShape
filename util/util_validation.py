@@ -6,6 +6,7 @@ sys.path.append(dir_parent)
 
 import pickle
 import glob
+import re
 import numpy as np
 import pandas as pd
 import torch
@@ -784,9 +785,82 @@ def get_comb_results(root_model, dataset_1, dataset_2, path_save, path_comb, pat
 
 
 # Shape Texture Conflict Validation
+def compute_miss_classified_dict(root_model, dataset, dataset_classifier, cuda_device):
+    _, root_test = get_root_dataset(dataset)
+
+    root_split = get_paths_to_embeddings_and_run_md(root_model, dataset_classifier)
+    path_run_md = root_split[1]
+    params = read_parameters_from_run_md(path_run_md)
+    if dataset_classifier:
+        epoch = root_split[-1]
+        path_classifier = get_path_classifier(root_model, dataset_classifier, params, epoch)
+
+    normalize = transforms.Normalize(mean=params['mean'], std=params['std'])
+    val_transform = transforms.Compose([
+        transforms.ToTensor(),
+        normalize,
+    ])
+    val_dataset = datasets.ImageFolder(root=root_test,
+                                        transform=val_transform)
+
+    val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=params['batch_size'],
+                                                shuffle=False, num_workers=8, pin_memory=True)
+    classes = val_dataset.classes
+
+    model = set_model(root_model, params, len(classes), cuda_device)
+    if dataset_classifier:
+        classifier = load_classifier_checkpoint(path_classifier, params["model"], len(classes), cuda_device)
+    else:
+        classifier = model.fc
+
+    model.eval()
+    classifier.eval()
+
+    miss_classified = None
+
+    for idx, (images, labels) in enumerate(tqdm(val_dataloader)):
+        images = images.cuda(device=cuda_device, non_blocking=True)
+        bsz = len(labels)
+
+        with torch.no_grad():
+            features = model.encoder(images)
+            output = classifier(features)
+            _, pred = output.topk(1, 1, True, True)
+
+        imgs_batch = np.array(val_dataset.imgs[idx*params['batch_size']:idx*params['batch_size']+bsz])
+        miss_classified_batch = imgs_batch[labels != pred.cpu().reshape(-1)]
+
+        if miss_classified is None:
+            miss_classified = miss_classified_batch
+        else:
+            miss_classified = np.append(miss_classified, miss_classified_batch, axis=0)
+            
+    return pd.DataFrame.from_dict({"image": miss_classified[:,0], "true_class": np.array(miss_classified[:,1], dtype=int)})
+
+
+def compute_exclude_dict(models_dict, dataset_stConflict, cuda_device):
+    root_orig_dict = {"./datasets/adaIN/shape_texture_conflict_animals10/": "animals10_diff_-1"}
+    dataset_orig = root_orig_dict[dataset_stConflict]
+    classes = get_classes(dataset_orig)
+
+    exclude_original_dict = dict()
+    for c in classes:
+        exclude_original_dict[c] = []
+
+    for m in models_dict:
+        root_model, dataset_classifier = models_dict[m]
+
+        df_miss_classified = compute_miss_classified_dict(root_model, dataset_orig, dataset_classifier, cuda_device)
+
+        for l,c in enumerate(classes):
+            exclude_original_dict[c].extend([p.split('/')[-1].split('.')[0] for p in df_miss_classified.query(f"true_class == {l}")["image"].values])
+
+    return exclude_original_dict
+
+
 class shapeTextureConflictDataset(Dataset):
 
-    def __init__(self, root, transform=None):
+    def __init__(self, root, transform=None, exclude_original_dict=None):
         self.root = root
         self.transform = transform
 
@@ -798,7 +872,17 @@ class shapeTextureConflictDataset(Dataset):
         for ls, shape in enumerate(self.classes):
             for lt, texture in enumerate(self.classes):
                 if ls != lt:
-                    s_t_paths = glob.glob(os.path.join(root, f"{shape}", f"{texture}", "*"))
+                    s_t_paths = np.array(glob.glob(os.path.join(root, f"{shape}", f"{texture}", "*")))
+
+                    if exclude_original_dict:
+                        keep_indices = [idx for idx in range(len(s_t_paths))]
+                        for e in exclude_original_dict[shape]:
+                            for idx, s_t in enumerate(s_t_paths):
+                                if re.search(f"/{e}_stylized_", s_t) and idx in keep_indices:
+                                    keep_indices.remove(idx)
+
+                        s_t_paths = s_t_paths[keep_indices]
+
                     self.paths.extend(s_t_paths)
                     self.targets_shape.extend(len(s_t_paths)*[ls])
                     self.targets_texture.extend(len(s_t_paths)*[lt])
@@ -852,6 +936,10 @@ def shape_texture_conflict_bias(df_pred, shape="shape_class", texture="texture_c
 
 
 def evaluate_shape_texture_conflict(models_dict, dataset_stConflict, cuda_device):
+    print("Get the union over all miss classified images")
+    exclude_original_dict = compute_exclude_dict(models_dict, dataset_stConflict, cuda_device)
+
+    print("Get predictions for shape texture cue conflict dataset")
     pred_dict = dict()
 
     for m in models_dict:
@@ -867,7 +955,7 @@ def evaluate_shape_texture_conflict(models_dict, dataset_stConflict, cuda_device
         normalize = transforms.Normalize(mean=params['mean'], std=params['std'])
         val_transform = transforms.Compose([transforms.Resize(params['size']), transforms.CenterCrop(params['size']), transforms.ToTensor(), normalize])
 
-        conflict_dataset = shapeTextureConflictDataset(dataset_stConflict, val_transform)
+        conflict_dataset = shapeTextureConflictDataset(dataset_stConflict, val_transform, exclude_original_dict)
         classes = conflict_dataset.classes
 
         conflict_dataloader = torch.utils.data.DataLoader(conflict_dataset, batch_size=params['batch_size'],
