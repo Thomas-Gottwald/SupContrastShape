@@ -75,12 +75,12 @@ Contrastive training:
 CUDA_VISIBLE_DEVICES=2 nohup python main_supcon.py --dataset animals10_diff_-1+4000 --data_folder ./datasets/animals10_diff/-1/train/ --diff_folder ./datasets/animals10_diff/4000/train/ --aug --learning_rate 0.125 --temp 0.1 --cosine --model resnet18 --epochs 300 --size 300 --batch_size 26 --method SupCon --mean "(0.3816, 0.3683, 0.3052)" --std "(0.3281, 0.3198, 0.3055)" --tag noAug > supCon_noAug.out &
 ```
 
-<!-- **Resnet18, batchsize: 26, learning rate: 0.125, epochs: 300, color Augmentations**
+**Resnet18, batchsize: 26, learning rate: 0.125, epochs: 300, colorJitter, grayscale, sameResizedCrop and sameHorizontalFlip Augmentations**
 
 Contrastive training:
 ```
-CUDA_VISIBLE_DEVICES=2 nohup python main_supcon.py --dataset animals10_diff_-1+4000 --data_folder ./datasets/animals10_diff/-1/train/ --diff_folder ./datasets/animals10_diff/4000/train/ --aug colorJitter grayscale --learning_rate 0.125 --temp 0.1 --cosine --model resnet18 --epochs 300 --size 300 --batch_size 26 --method SupCon--mean "(0.3816, 0.3683, 0.3052)" --std "(0.3281, 0.3198, 0.3055)" --tag colorAug > supCon_colorAug.out &
-``` -->
+CUDA_VISIBLE_DEVICES=1 nohup python main_supcon.py --dataset animals10_diff_-1+4000 --data_folder ./datasets/animals10_diff/-1/train/ --diff_folder ./datasets/animals10_diff/4000/train/ --aug sameResizedCrop sameHorizontalFlip colorJitter grayscale --learning_rate 0.125 --temp 0.1 --cosine --model resnet18 --epochs 300 --size 300 --batch_size 26 --method SupCon --mean "(0.3816, 0.3683, 0.3052)" --std "(0.3281, 0.3198, 0.3055)" --tag colorAugSameShapeAug > supCon_colorAugSameShapeAug.out &
+```
 
 ## Cross Entropy Learning with animals10_diff
 
@@ -95,7 +95,7 @@ CUDA_VISIBLE_DEVICES=1 nohup python main_ce.py --dataset animals10_diff_4000 --d
 
 Training:
 ```
-CUDA_VISIBLE_DEVICES=0 nohup python main_ce.py --dataset animals10_diff_8000 --data_folder ./datasets/animals10_diff/8000/train/ --test_folder ./datasets/animals10_diff/8000/test/ --num_classes 10 --learning_rate 0.125 --cosine --model resnet18 --epochs 500 --size 300 --batch_size 26 --batch_size_val 26 --mean "(0.3912, 0.3774, 0.3121)" --std "(0.3290, 0.3202, 0.3050)" --tag 8000 > supCE_8000.out &
+CUDA_VISIBLE_DEVICES=1 nohup python main_ce.py --dataset animals10_diff_8000 --data_folder ./datasets/animals10_diff/8000/train/ --test_folder ./datasets/animals10_diff/8000/test/ --num_classes 10 --learning_rate 0.125 --cosine --model resnet18 --epochs 500 --size 300 --batch_size 26 --batch_size_val 26 --mean "(0.3912, 0.3774, 0.3121)" --std "(0.3290, 0.3202, 0.3050)" --tag 8000 > supCE_8000.out &
 ```
 
 **Resnet18, batchsize: 26, learning rate: 0.125, epochs: 500, use diffused images as augmentation**
@@ -103,6 +103,13 @@ CUDA_VISIBLE_DEVICES=0 nohup python main_ce.py --dataset animals10_diff_8000 --d
 Training:
 ```
 CUDA_VISIBLE_DEVICES=1 nohup python main_ce.py --dataset animals10_diff_-1+4000 --data_folder ./datasets/animals10_diff/-1/train/ --diff_folder ./datasets/animals10_diff/4000/train/ --test_folder ./datasets/animals10_diff/-1/test/ --num_classes 10 --learning_rate 0.125 --cosine --model resnet18 --epochs 500 --size 300 --batch_size 26 --batch_size_val 26 --mean "(0.3816, 0.3683, 0.3052)" --std "(0.3281, 0.3198, 0.3055)" --tag diffAug > supCE_diffAug.out &
+```
+
+**Resnet18, batchsize: 26, learning rate: 0.125, epochs: 500, use diffused images as augmentation and also all kinds of augmentations**
+
+Training:
+```
+CUDA_VISIBLE_DEVICES=2 nohup python main_ce.py --dataset animals10_diff_-1+4000 --data_folder ./datasets/animals10_diff/-1/train/ --diff_folder ./datasets/animals10_diff/4000/train/ --test_folder ./datasets/animals10_diff/-1/test/ --aug resizedCrop horizontalFlip colorJitter grayscale --num_classes 10 --learning_rate 0.125 --cosine --model resnet18 --epochs 500 --size 300 --batch_size 26 --batch_size_val 26 --mean "(0.3816, 0.3683, 0.3052)" --std "(0.3281, 0.3198, 0.3055)" --tag diffAugAllAug > supCE_diffAugAllAug.out &
 ```
 
 ## No Training Baseline
@@ -182,4 +189,11 @@ CUDA_VISIBLE_DEVICES=2 nohup python main_ce.py --dataset animals10 --data_folder
 Training:
 ```
 CUDA_VISIBLE_DEVICES=2 nohup python main_ce.py --dataset city_classification_original --data_folder ./datasets/city_classification/Original/train/ --test_folder ./datasets/city_classification/Original/val/ --num_classes 11 --learning_rate 0.125 --cosine --model resnet18 --epochs 500 --size 300 --batch_size 26 --batch_size_val 26 --mean "(0.1667, 0.1889, 0.1641)" --std "(0.1941, 0.2075, 0.1908)" --tag cityBaseline > supCE_cityBaseline.out &
+```
+
+## Cross Entropy Learning with city_classification_diff
+
+Training:
+```
+CUDA_VISIBLE_DEVICES=2 nohup python main_ce.py --dataset city_classification_diff --data_folder ./datasets/city_classification/EEDv2_5792_as_Original5/train/ --test_folder ./datasets/city_classification/EEDv2_5792_as_Original5/val/ --num_classes 11 --learning_rate 0.125 --cosine --model resnet18 --epochs 500 --size 300 --batch_size 26 --batch_size_val 26 --mean "(0.1471, 0.1704, 0.1445)" --std "(0.1896, 0.2021, 0.1862)" --tag cityDiff > supCE_cityDiff.out &
 ```
