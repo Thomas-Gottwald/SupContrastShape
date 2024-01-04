@@ -1,4 +1,6 @@
 import argparse
+import csv
+from util.util_logging import try_eval
 
 def parse_option():
     parser = argparse.ArgumentParser('arguments')
@@ -19,6 +21,10 @@ def parse_option():
                         type=float, help='probability to apply colorJitter and how much to jitter brightness, contrast, saturation and hue')
 
     parser.add_argument('--grayscale', default=0.2, type=float, help='probability for random grayscale')
+
+
+    parser.add_argument('--pre_comp_feat', action='store_true',
+                        help='Use pre computed feature embedding')
 
 
     opt = parser.parse_args()
@@ -45,7 +51,28 @@ def parse_option():
 def main():
     opt = parse_option()
 
-    print(opt)
+    print(vars(opt))
+
+    # with open("zz_test.csv", 'w') as f:
+    #     w = csv.DictWriter(f, vars(opt).keys())
+    #     w.writeheader()
+    #     w.writerow(vars(opt))
+
+    # params = dict()
+    # with open("zz_test.csv", 'r') as f:
+    #     r = csv.DictReader(f)
+    #     for row in r:
+    #         for key in row:
+    #             value = try_eval(row[key])
+    #             params[key] = None if value == '' else value
+
+    # print(params)
+
+    if opt.pre_comp_feat:
+        print("pre_comp_feat")
+
+    if not opt.pre_comp_feat:
+        print("not pre_comp_feat")
 
 
 if __name__ == '__main__':

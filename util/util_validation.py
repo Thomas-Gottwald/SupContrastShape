@@ -41,10 +41,26 @@ def get_root_dataset(dataset):
     elif dataset == "animals10_diff_-1":
         root_train = "./datasets/animals10_diff/-1/train/"
         root_test = "./datasets/animals10_diff/-1/test/"
+    elif dataset == "animals10_diff_-1_small":
+        root_train = "./datasets/animals10_diff/-1/train_small/"
+        root_test = "./datasets/animals10_diff/-1/test/"
     elif dataset == "animals10_diff_4000":
         root_train = "./datasets/animals10_diff/4000/train/"
         root_test = "./datasets/animals10_diff/4000/test/"
+    elif dataset == "animals10_diff_4000_small":
+        root_train = "./datasets/animals10_diff/4000/train_small/"
+        root_test = "./datasets/animals10_diff/4000/test/"
+    elif dataset == "animals10_diff_8000":
+        root_train = "./datasets/animals10_diff/8000/train/"
+        root_test = "./datasets/animals10_diff/8000/test/"
+    elif dataset == "city_classification_original":
+        root_train = "./datasets/city_classification/Original/train/"
+        root_test = "./datasets/city_classification/Original/val/"
+    elif dataset == "city_classification_diff":
+        root_train = "./datasets/city_classification/EEDv2_5792_as_Original5/train/"
+        root_test = "./datasets/city_classification/EEDv2_5792_as_Original5/val/"
     else:
+        root_train = None
         root_test = None
 
     return root_train, root_test
@@ -69,21 +85,12 @@ def get_paths_to_embeddings_and_run_md(root_model, dataset_1=None, dataset_2=Non
     path_run_md = os.path.join(path_save, "run.md")
 
     if dataset_1:
-        training_dataset = split_model[-4]
-        if dataset_1 == training_dataset:
-            path_val_md_1 = path_run_md
-            path_embeddings_1 = os.path.join(path_save, f"val_{epoch}", "embeddings")
-        else:
-            path_val_md_1 = os.path.join(path_save, f"val_{dataset_1}.md")
-            path_embeddings_1 = os.path.join(path_save, f"val_{dataset_1}_{epoch}", "embeddings")
+        path_val_md_1 = os.path.join(path_save, f"val_{dataset_1}.md")
+        path_embeddings_1 = os.path.join(path_save, f"val_{epoch}", f"{dataset_1}", "embeddings")
 
         if dataset_2:
-            if dataset_2 == training_dataset:
-                path_val_md_2 = path_run_md
-                path_embeddings_2 = os.path.join(path_save, f"val_{epoch}", "embeddings")
-            else:
-                path_val_md_2 = os.path.join(path_save, f"val_{dataset_2}.md")
-                path_embeddings_2 = os.path.join(path_save, f"val_{dataset_2}_{epoch}", "embeddings")
+            path_val_md_2 = os.path.join(path_save, f"val_{dataset_2}.md")
+            path_embeddings_2 = os.path.join(path_save, f"val_{epoch}", f"{dataset_2}", "embeddings")
 
             if dataset_1 < dataset_2:
                 path_comb_md = os.path.join(*split_model[:-2], f"comb_{dataset_1}_{dataset_2}.md")
@@ -126,7 +133,9 @@ def get_path_classifier(root_model, dataset, params, epoch):
     if dataset == params['dataset']:
         path_classifier = glob.glob(os.path.join(*split_model[:-2], f"val_{epoch}", "classifier", f"{params['dataset']}*/"))
     else:
-        path_classifier = glob.glob(os.path.join(*split_model[:-2], f"val_{dataset}_{epoch}", "classifier", f"{params['dataset']}*/"))
+        path_classifier = glob.glob(os.path.join(*split_model[:-2], f"val_{epoch}", f"{dataset}", "classifier", f"{params['dataset']}*/"))# new version
+        if len(path_classifier) == 0:
+            path_classifier = glob.glob(os.path.join(*split_model[:-2], f"val_{dataset}_{epoch}", "classifier", f"{params['dataset']}*/"))# old version
     if len(path_classifier) > 0:
         path_classifier = (path_classifier[0])[:-1]
 
@@ -313,8 +322,8 @@ def compute_and_save_embeddings(model, dataset, train_loader, val_loader, path_v
     if not os.path.isdir(path_embeddings):
         os.makedirs(path_embeddings)
 
-    if params['dataset'] != dataset:
-        create_val_md(path_val_md=path_val_md, dataset_val=dataset)
+    # if params['dataset'] != dataset:
+    #     create_val_md(path_val_md=path_val_md, dataset_val=dataset)# TODO remove if no longer needed
 
     # Trainings Data
     embedding_train, class_labels_train = compute_embedding(model, train_loader, params, cuda_device)
@@ -357,9 +366,10 @@ def save_tSNE_plots(dataset, path_val_md, path_embeddings, params, epoch):
         df_train['class'] = df_train['label']
         df_test['class'] = df_test['label']
 
+    cmap = 'tab10' if len(classes)<=10 else 'tab20'
     fig, ax = plt.subplots(figsize=(6, 5))
     fig.tight_layout()
-    seaborn.scatterplot(df_train, x='x', y='y', hue='class', palette='tab10', ax=ax)
+    seaborn.scatterplot(df_train, x='x', y='y', hue='class', palette=cmap, ax=ax)
     ax.collections[0].set_sizes([10])
     ax.set_title(f"Data: {dataset} (Train)\nModel: {params['model']}, bsz={params['batch_size']} (epoch {epoch})", y=1.2)
     ax.legend(loc='upper center', ncols=4, bbox_to_anchor=(0.5,1.22))
@@ -367,13 +377,13 @@ def save_tSNE_plots(dataset, path_val_md, path_embeddings, params, epoch):
 
     fig, ax = plt.subplots(figsize=(6, 5))
     fig.tight_layout()
-    seaborn.scatterplot(df_test, x='x', y='y', hue='class', palette='tab10', ax=ax)
+    seaborn.scatterplot(df_test, x='x', y='y', hue='class', palette=cmap, ax=ax)
     ax.collections[0].set_sizes([10])
     ax.set_title(f"Data: {dataset} (Test)\nModel: {params['model']}, bsz={params['batch_size']} (epoch {epoch})", y=1.2)
     ax.legend(loc='upper center', ncols=4, bbox_to_anchor=(0.5,1.22))
     fig.savefig(os.path.join(path_embeddings, f"tSNE_epoch_{epoch}_test.png"), bbox_inches="tight")
     
-    add_tsne_to_run_md(path=path_val_md, epoch=epoch, dataset_val=(None if params['dataset']==dataset else dataset))
+    # add_tsne_to_run_md(path=path_val_md, epoch=epoch, dataset_val=(None if params['dataset']==dataset else dataset))# TODO remove if no longer needed
 
 
 def plot_tSNE(dataset, path_embeddings, params, epoch):
@@ -399,15 +409,16 @@ def plot_tSNE(dataset, path_embeddings, params, epoch):
         df_train['class'] = df_train['label']
         df_test['class'] = df_test['label']
 
-    fig, axs = plt.subplots(ncols=2, figsize=(11, 5))
-    fig.tight_layout(h_pad=4)
+    cmap = 'tab10' if len(classes)<=10 else 'tab20'
+    fig, axs = plt.subplots(ncols=2, figsize=(13, 5))
+    fig.tight_layout(w_pad=6)
 
-    seaborn.scatterplot(df_train, x='x', y='y', hue='class', palette='tab10', ax=axs[0])
+    seaborn.scatterplot(df_train, x='x', y='y', hue='class', palette=cmap, ax=axs[0])
     axs[0].collections[0].set_sizes([10])
     axs[0].set_title(f"Data: {dataset} (Train)\nModel: {params['model']}, bsz={params['batch_size']} (epoch {epoch})", y=1.2)
     axs[0].legend(loc='upper center', ncols=4, bbox_to_anchor=(0.5,1.2))
 
-    seaborn.scatterplot(df_test, x='x', y='y', hue='class', palette='tab10', ax=axs[1])
+    seaborn.scatterplot(df_test, x='x', y='y', hue='class', palette=cmap, ax=axs[1])
     axs[1].collections[0].set_sizes([10])
     axs[1].set_title(f"Data: {dataset} (Test)\nModel: {params['model']}, bsz={params['batch_size']} (epoch {epoch})", y=1.2)
     axs[1].legend(loc='upper center', ncols=4, bbox_to_anchor=(0.5,1.2))
@@ -417,7 +428,10 @@ def plot_tSNE(dataset, path_embeddings, params, epoch):
 def move_classifier_out_file(path_classifier):
     os.makedirs(os.path.join(path_classifier, "out"), exist_ok=True)
 
-    os.replace("precomp_classifier.out", os.path.join(path_classifier, "out", "precomp_classifier.out"))
+    if os.path.isfile("classifier.out"):
+        os.replace("classifier.out", os.path.join(path_classifier, "out", "classifier.out"))# new version
+    else:
+        os.replace("precomp_classifier.out", os.path.join(path_classifier, "out", "precomp_classifier.out"))# old version
 
 
 def load_classifier_plots(path_classifier):
@@ -456,7 +470,7 @@ def load_classifier_checkpoint(path_classifier, model_name, num_classes, cuda_de
     return classifier
 
 
-def set_up_classifier(path_classifier, path_embeddings, params, cuda_device):
+def set_up_classifier(root_model, dataset, path_embeddings, params, epoch, cuda_device):
     train_dataset = featureEmbeddingDataset(root=os.path.join(path_embeddings, 'embedding_train'))
 
     val_dataset = featureEmbeddingDataset(root=os.path.join(path_embeddings, 'embedding_test'))
@@ -468,8 +482,13 @@ def set_up_classifier(path_classifier, path_embeddings, params, cuda_device):
         val_dataset, batch_size=256, shuffle=False,
         num_workers=16, pin_memory=True)
 
-    classifier = load_classifier_checkpoint(path_classifier=path_classifier, model_name=params["model"],
-                                            num_classes=len(set(val_dataset.targets)), cuda_device=cuda_device)
+    if 'method' in params:
+        path_classifier = get_path_classifier(root_model=root_model, dataset=dataset, params=params, epoch=epoch)
+        classifier = load_classifier_checkpoint(path_classifier=path_classifier, model_name=params["model"],
+                                                num_classes=len(set(val_dataset.targets)), cuda_device=cuda_device)
+    else:
+        model = set_model(root_model, params, params["num_classes"], cuda_device)
+        classifier = model.fc
 
     return classifier, train_loader, val_loader
 
@@ -497,29 +516,37 @@ def get_confusion_matrix(df_pred, true="true_class", pred="pred_class"):
     # confusion matrix
     C = confusion_matrix(df_pred[true], df_pred[pred])
 
-    c_lens = df_pred[[true, pred]].groupby(true).count().values.reshape(-1)
+    return C
+
+
+def compute_accuracies(C):
+    c_lens = C.sum(1)
+    all_len = C.sum()
 
     # accuracy
     acc = 0.0
     for i in range(len(c_lens)):
         acc += C[i,i]
-    acc *= 100/len(df_pred)
-    acc
+    acc *= 100/all_len
     # balanced accuracy
     acc_b = 0.0
     for i, n in enumerate(c_lens):
         acc_b += C[i,i] / n
     acc_b *= 100/len(c_lens)
-    acc_b
 
-    return C, acc, acc_b
+    return acc, acc_b
 
 
 def save_confusion_matrix(C, classes, path, title="Confusion Matrix"):
+    # save the confusion matrix as csv file
+    df_cm = pd.DataFrame(C)
+    df_cm.to_csv(path.replace(".png", ".csv"), index=False)
+
+    # save plot of the confusion matrix
     seaborn.set_theme(style="ticks")
 
     disp = ConfusionMatrixDisplay(C, display_labels=classes)
-    disp.plot(xticks_rotation=45)
+    disp.plot(xticks_rotation=(45 if len(classes)<=10 else 90))
     for labels in disp.text_.ravel():
         labels.set_fontsize(10)
     disp.ax_.set_title(title)
@@ -528,22 +555,35 @@ def save_confusion_matrix(C, classes, path, title="Confusion Matrix"):
     plt.savefig(path)
 
 
-def compute_and_save_confusion_matrix(root_model, dataset, path_embeddings, params, epoch, cuda_device):
-    path_classifier = get_path_classifier(root_model, dataset, params, epoch)
-    classifier, train_loader, val_loader = set_up_classifier(path_classifier, path_embeddings, params, cuda_device)
+def load_confusion_matrix(path):
+    df_cm = pd.read_csv(path)
+    C = df_cm.to_numpy()
+
+    return C
+
+
+def compute_and_save_confusion_matrix(root_model, dataset_classifier, path_embeddings, params, epoch, cuda_device):
+    classifier, train_loader, val_loader = set_up_classifier(root_model, dataset_classifier, path_embeddings, params, epoch, cuda_device)
 
     df_pred_train = get_predictions(classifier, train_loader, cuda_device)
     df_pred_val = get_predictions(classifier, val_loader, cuda_device)
 
-    C_train, acc_train, acc_b_train = get_confusion_matrix(df_pred_train)
-    C_val, acc_val, acc_b_val = get_confusion_matrix(df_pred_val)
+    C_train = get_confusion_matrix(df_pred_train)
+    acc_train, acc_b_train = compute_accuracies(C_train)
+    C_val = get_confusion_matrix(df_pred_val)
+    acc_val, acc_b_val = compute_accuracies(C_val)
 
+    dataset = path_embeddings.split('/')[-2].replace("val_", '').replace(f"_{epoch}", '')
+    if re.fullmatch(f"val_.+_{epoch}", dataset):
+        dataset = dataset.replace("val_", '')
+        dataset = "_".join(dataset.split('_')[:-1])
     classes = get_classes(dataset)
 
+    os.makedirs(os.path.join(*path_embeddings.split('/')[:-1], "cm"), exist_ok=True)
     save_confusion_matrix(C_train, classes, title=f"Confusion Matrix {dataset} (Train) (epoch: {epoch})",
-                        path=os.path.join(path_classifier, "models", f"cm_train_epoch_{epoch}.png"))
+                        path=os.path.join(*path_embeddings.split('/')[:-1], "cm", f"cm_train_epoch_{epoch}.png"))
     save_confusion_matrix(C_val, classes, title=f"Confusion Matrix {dataset} (Test) (epoch: {epoch})",
-                        path=os.path.join(path_classifier, "models", f"cm_val_epoch_{epoch}.png"))
+                        path=os.path.join(*path_embeddings.split('/')[:-1], "cm", f"cm_val_epoch_{epoch}.png"))
     
     return C_train, acc_train, acc_b_train, C_val, acc_val, acc_b_val
     
@@ -581,7 +621,7 @@ def compute_mean_distance(embedding_1, embedding_2, class_labels):
 
     mean_distances_all /= len(class_labels)
 
-    return mean_distance, mean_distance_classes, mean_distances_all
+    return mean_distance.item(), mean_distance_classes, mean_distances_all.item()
 
 
 def plot_distances(dataset_1, dataset_2, embedding_train_1, embedding_train_2, class_labels_train, embedding_test_1, embedding_test_2, class_labels_test):
@@ -598,7 +638,7 @@ def plot_distances(dataset_1, dataset_2, embedding_train_1, embedding_train_2, c
 
     axs[0].scatter(np.arange(len(class_labels_train)), distances_embeddings_train, s=2, c=class_labels_train, cmap='tab10')
     df_train['class_mean'].plot(c='black', label="class mean", ax=axs[0])
-    df_train['mean'].plot(c='darkred', linestyle='--', label=f"mean ({df_train['mean'][0]:.3f})", ax=axs[0])
+    df_train['mean'].plot(c='darkred', linestyle='--', label=f"mean ({df_train['mean'][0]:.4f})", ax=axs[0])
     axs[0].set_ylabel('cosine distance')
     axs[0].legend()
     axs[0].set_title(f"Training Data:\n{dataset_1} vs. {dataset_2}")
@@ -613,7 +653,7 @@ def plot_distances(dataset_1, dataset_2, embedding_train_1, embedding_train_2, c
 
     axs[1].scatter(np.arange(len(class_labels_test)), distances_embeddings, s=2, c=class_labels_test, cmap='tab10')
     df['class_mean'].plot(c='black', label="class mean", ax=axs[1])
-    df['mean'].plot(c='darkred', linestyle='--', label=f"mean ({df['mean'][0]:.3f})", ax=axs[1])
+    df['mean'].plot(c='darkred', linestyle='--', label=f"mean ({df['mean'][0]:.4f})", ax=axs[1])
     axs[1].set_ylabel('cosine distance')
     axs[1].legend()
     axs[1].set_title(f"Test Data:\n{dataset_1} vs. {dataset_2}")
@@ -643,28 +683,28 @@ def plot_aug_distances(dataset_1, dataset_2, embedding_1, embedding_2, embedding
 
     axs[0,0].scatter(np.arange(len(class_labels)), distances_embeddings, s=2, c=class_labels, cmap='tab10')
     df['class_mean'].plot(c='black', label="class mean", ax=axs[0,0])
-    df['mean'].plot(c='darkred', linestyle='--', label=f"mean ({df['mean'][0]:.3f})", ax=axs[0,0])
+    df['mean'].plot(c='darkred', linestyle='--', label=f"mean ({df['mean'][0]:.4f})", ax=axs[0,0])
     axs[0,0].set_ylabel('cosine distance')
     axs[0,0].set_title(f"{dataset_1} vs. {dataset_2}")
     axs[0,0].legend()
 
     axs[0,1].scatter(np.arange(len(class_labels)), distances_embeddings_aug, s=2, c=class_labels, cmap='tab10')
     df['class_mean_aug'].plot(c='black', label="class mean", ax=axs[0,1])
-    df['mean_aug'].plot(c='darkred', linestyle='--', label=f"mean ({df['mean_aug'][0]:.3f})", ax=axs[0,1])
+    df['mean_aug'].plot(c='darkred', linestyle='--', label=f"mean ({df['mean_aug'][0]:.4f})", ax=axs[0,1])
     axs[0,1].set_ylabel('cosine distance')
     axs[0,1].set_title(f"{dataset_1} vs. {dataset_2} both with\n{', '.join(aug)}")
     axs[0,1].legend()
 
     axs[1,0].scatter(np.arange(len(class_labels)), distances_embeddings_aug_1, s=2, c=class_labels, cmap='tab10')
     df['class_mean_aug_1'].plot(c='black', label="class mean", ax=axs[1,0])
-    df['mean_aug_1'].plot(c='darkred', linestyle='--', label=f"mean ({df['mean_aug_1'][0]:.3f})", ax=axs[1,0])
+    df['mean_aug_1'].plot(c='darkred', linestyle='--', label=f"mean ({df['mean_aug_1'][0]:.4f})", ax=axs[1,0])
     axs[1,0].set_ylabel('cosine distance')
     axs[1,0].set_title(f"{dataset_1} vs. {dataset_1} with\n{', '.join(aug)}")
     axs[1,0].legend()
 
     axs[1,1].scatter(np.arange(len(class_labels)), distances_embeddings_aug_2, s=2, c=class_labels, cmap='tab10')
     df['class_mean_aug_2'].plot(c='black', label="class mean", ax=axs[1,1])
-    df['mean_aug_2'].plot(c='darkred', linestyle='--', label=f"mean ({df['mean_aug_2'][0]:.3f})", ax=axs[1,1])
+    df['mean_aug_2'].plot(c='darkred', linestyle='--', label=f"mean ({df['mean_aug_2'][0]:.4f})", ax=axs[1,1])
     axs[1,1].set_ylabel('cosine distance')
     axs[1,1].set_title(f"{dataset_2} vs. {dataset_2} with\n{', '.join(aug)}")
     axs[1,1].legend()
@@ -679,7 +719,7 @@ def plot_roll_distances(shifts, dataset_1, dataset_2, embedding_1, embedding_2, 
 
     plt.scatter(np.arange(len(class_labels)), distances_embeddings_roll, s=2, c=class_labels, cmap='tab10')
     df_roll['class_mean'].plot(c='black', label="class mean")
-    df_roll['mean'].plot(c='darkred', linestyle='--', label=f"mean ({df_roll['mean'][0]:.3f})")
+    df_roll['mean'].plot(c='darkred', linestyle='--', label=f"mean ({df_roll['mean'][0]:.4f})")
     plt.ylabel('cosine distance')
     plt.title(f"{dataset_1} vs. {dataset_2} with\n shift {shifts}")
     plt.legend()
@@ -730,19 +770,23 @@ def get_comb_results(root_model, dataset_1, dataset_2, path_save, path_comb, pat
                 
                 # evaluate classifiers
                 # classifier trained on dataset_1 evaluate on dataset_1
-                classifier, train_loader, val_loader = set_up_classifier(path_classifier_e_1, path_embeddings_e_1, params, cuda_device)
+                classifier, train_loader, val_loader = set_up_classifier(root_model, dataset_1, path_embeddings_e_1, params, e, cuda_device)
                 df_pred_train = get_predictions(classifier, train_loader, cuda_device)
                 df_pred_val = get_predictions(classifier, val_loader, cuda_device)
-                C_train, acc_train, acc_b_train = get_confusion_matrix(df_pred_train)
-                C_val, acc_val, acc_b_val = get_confusion_matrix(df_pred_val)
+                C_train = get_confusion_matrix(df_pred_train)
+                acc_train, acc_b_train = compute_accuracies(C_train)
+                C_val = get_confusion_matrix(df_pred_val)
+                acc_val, acc_b_val = compute_accuracies(C_val)
                 comb_dict[f'acc{e}'] = [[acc_train, acc_b_train, acc_val, acc_b_val]]
 
                 # classifier trained on dataset_1 evaluate on dataset_2
-                classifier, train_loader, val_loader = set_up_classifier(path_classifier_e_1, path_embeddings_e_2, params, cuda_device)
+                classifier, train_loader, val_loader = set_up_classifier(root_model, dataset_1, path_embeddings_e_2, params, e, cuda_device)
                 df_pred_train = get_predictions(classifier, train_loader, cuda_device)
                 df_pred_val = get_predictions(classifier, val_loader, cuda_device)
-                C_train, acc_train, acc_b_train = get_confusion_matrix(df_pred_train)
-                C_val, acc_val, acc_b_val = get_confusion_matrix(df_pred_val)
+                C_train = get_confusion_matrix(df_pred_train)
+                acc_train, acc_b_train = compute_accuracies(C_train)
+                C_val = get_confusion_matrix(df_pred_val)
+                acc_val, acc_b_val = compute_accuracies(C_val)
                 save_confusion_matrix(C_train, classes, title=f"Confusion Matrix {dataset_2} (Train) (epoch: {e})",
                                     path=cm_comb_plots_1[0])
                 save_confusion_matrix(C_val, classes, title=f"Confusion Matrix {dataset_2} (Test) (epoch: {e})",
@@ -750,19 +794,23 @@ def get_comb_results(root_model, dataset_1, dataset_2, path_save, path_comb, pat
                 comb_dict[f'acc{e}'].append([acc_train, acc_b_train, acc_val, acc_b_val])
 
                 # classifier trained on dataset_second evaluate on dataset_second
-                classifier, train_loader, val_loader = set_up_classifier(path_classifier_e_2, path_embeddings_e_2, params, cuda_device)
+                classifier, train_loader, val_loader = set_up_classifier(root_model, dataset_2, path_embeddings_e_2, params, e, cuda_device)
                 df_pred_train = get_predictions(classifier, train_loader, cuda_device)
                 df_pred_val = get_predictions(classifier, val_loader, cuda_device)
-                C_train, acc_train, acc_b_train = get_confusion_matrix(df_pred_train)
-                C_val, acc_val, acc_b_val = get_confusion_matrix(df_pred_val)
+                C_train = get_confusion_matrix(df_pred_train)
+                acc_train, acc_b_train = compute_accuracies(C_train)
+                C_val = get_confusion_matrix(df_pred_val)
+                acc_val, acc_b_val = compute_accuracies(C_val)
                 comb_dict[f'acc{e}'].append([acc_train, acc_b_train, acc_val, acc_b_val])
 
                 # classifier trained on dataset_second evaluate on dataset_val
-                classifier, train_loader, val_loader = set_up_classifier(path_classifier_e_2, path_embeddings_e_1, params, cuda_device)
+                classifier, train_loader, val_loader = set_up_classifier(root_model, dataset_2, path_embeddings_e_1, params, e, cuda_device)
                 df_pred_train = get_predictions(classifier, train_loader, cuda_device)
                 df_pred_val = get_predictions(classifier, val_loader, cuda_device)
-                C_train, acc_train, acc_b_train = get_confusion_matrix(df_pred_train)
-                C_val, acc_val, acc_b_val = get_confusion_matrix(df_pred_val)
+                C_train = get_confusion_matrix(df_pred_train)
+                acc_train, acc_b_train = compute_accuracies(C_train)
+                C_val = get_confusion_matrix(df_pred_val)
+                acc_val, acc_b_val = compute_accuracies(C_val)
                 save_confusion_matrix(C_train, classes, title=f"Confusion Matrix {dataset_1} (Train) (epoch: {e})",
                                     path=cm_comb_plots_2[0])
                 save_confusion_matrix(C_val, classes, title=f"Confusion Matrix {dataset_1} (Test) (epoch: {e})",
@@ -791,9 +839,14 @@ def compute_miss_classified_dict(root_model, dataset, dataset_classifier, cuda_d
     root_split = get_paths_to_embeddings_and_run_md(root_model, dataset_classifier)
     path_run_md = root_split[1]
     params = read_parameters_from_run_md(path_run_md)
+    path_classifier = None
     if dataset_classifier:
         epoch = root_split[-1]
         path_classifier = get_path_classifier(root_model, dataset_classifier, params, epoch)
+    elif "method" in params:
+        epoch = root_split[-1]
+        path_classifier = get_path_classifier(root_model, "", params, epoch)
+
 
     normalize = transforms.Normalize(mean=params['mean'], std=params['std'])
     val_transform = transforms.Compose([
@@ -801,14 +854,14 @@ def compute_miss_classified_dict(root_model, dataset, dataset_classifier, cuda_d
         normalize,
     ])
     val_dataset = datasets.ImageFolder(root=root_test,
-                                        transform=val_transform)
+                                       transform=val_transform)
 
     val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=params['batch_size'],
-                                                shuffle=False, num_workers=8, pin_memory=True)
+                                                 shuffle=False, num_workers=8, pin_memory=True)
     classes = val_dataset.classes
 
     model = set_model(root_model, params, len(classes), cuda_device)
-    if dataset_classifier:
+    if path_classifier:
         classifier = load_classifier_checkpoint(path_classifier, params["model"], len(classes), cuda_device)
     else:
         classifier = model.fc
@@ -948,9 +1001,13 @@ def evaluate_shape_texture_conflict(models_dict, dataset_stConflict, cuda_device
         root_split = get_paths_to_embeddings_and_run_md(root_model, dataset_classifier)
         path_run_md = root_split[1]
         params = read_parameters_from_run_md(path_run_md)
+        path_classifier = None
         if dataset_classifier:
             epoch = root_split[-1]
             path_classifier = get_path_classifier(root_model, dataset_classifier, params, epoch)
+        elif "method" in params:
+            epoch = root_split[-1]
+            path_classifier = get_path_classifier(root_model, "", params, epoch)
 
         normalize = transforms.Normalize(mean=params['mean'], std=params['std'])
         val_transform = transforms.Compose([transforms.Resize(params['size']), transforms.CenterCrop(params['size']), transforms.ToTensor(), normalize])
@@ -962,7 +1019,7 @@ def evaluate_shape_texture_conflict(models_dict, dataset_stConflict, cuda_device
                                                           shuffle=False, num_workers=8, pin_memory=True)
         
         model = set_model(root_model, params, len(classes), cuda_device)
-        if dataset_classifier:
+        if path_classifier:
             classifier = load_classifier_checkpoint(path_classifier, params["model"], len(classes), cuda_device)
         else:
             classifier = model.fc
@@ -971,7 +1028,7 @@ def evaluate_shape_texture_conflict(models_dict, dataset_stConflict, cuda_device
 
         pred_dict[m] = df_pred
 
-    return pred_dict, classes
+    return pred_dict, classes, exclude_original_dict
 
 
 def compute_shape_biases(pred_dict, classes):

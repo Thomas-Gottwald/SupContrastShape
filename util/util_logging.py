@@ -1,6 +1,7 @@
 import os
 import glob
 import re
+import csv
 import numpy as np
 import pandas as pd
 import seaborn
@@ -111,6 +112,48 @@ def create_crossentropy_plots(path):
     
     df_log.plot.line(x='step', y='val_acc', title="Validation top-1 accuracy"
                     ).get_figure().savefig(os.path.join(path, "tensorboard", "val_top1.png"))
+
+
+# csv files for training parameters
+def create_csv_file_training(opt, csv_file, other_dict:dict=dict()):
+    params = vars(opt)
+    for k in other_dict:
+        params[k] = other_dict[k]
+
+    with open(csv_file, 'w') as f:
+        w = csv.DictWriter(f, vars(opt).keys())
+        w.writeheader()
+        w.writerow(vars(opt))
+
+
+def create_csv_file_with_best_acc(opt, best_acc, csv_file):
+    other_dict = {"best_acc": best_acc}
+    create_csv_file_training(opt, other_dict, csv_file)
+
+
+def create_classifier_csv_file(opt, best_acc, csv_file):
+    params = vars(opt)
+    params["best_acc"] = best_acc
+
+    with open(csv_file, 'w') as f:
+        w = csv.DictWriter(f, vars(opt).keys())
+        w.writeheader()
+        w.writerow(vars(opt))
+
+
+def open_csv_file(csv_file):
+    params = dict()
+
+    with open(csv_file, 'r') as f:
+        r = csv.DictReader(f)
+        for row in r:
+            for key in row:
+                value = try_eval(row[key])
+                params[key] = None if value == '' else value
+
+    return params
+
+
 
 
 # run.md file for the trained models

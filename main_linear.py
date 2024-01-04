@@ -16,7 +16,7 @@ from util.util import adjust_learning_rate, warmup_learning_rate, accuracy
 from util.util import set_optimizer, save_model
 from util.util_pre_com_feat import set_feature_loader, IdentityWrapperNet
 from networks.resnet_big import SupConResNet, LinearClassifier
-from util.util_logging import create_classifier_training_plots, add_class_to_run_md
+from util.util_logging import create_classifier_training_plots, create_classifier_csv_file
 
 
 def parse_option():
@@ -84,7 +84,7 @@ def parse_option():
                         help='path to pre-trained model')
     parser.add_argument('--pre_comp_feat', action='store_true',
                         help='Use pre computed feature embedding')
-    parser.add_argument('--md_file', type=str, default=None,
+    parser.add_argument('--md_file', type=str, default=None,# TODO remove if no longer needed
                         help='Name of the markdown file to write the results. Use only for different than training datasets!')
 
     # optional identifier tag
@@ -117,7 +117,7 @@ def parse_option():
         assert len(path_split) > 2
         opt.model_path = os.path.join(*path_split[:-2], "classifier")
     else:
-        path_split = opt.chkp.split('/')
+        path_split = opt.ckpt.split('/')
         assert len(path_split) > 2
         epoch = path_split[-1].replace(".pth", '').split('_')[-1]
         opt.model_path = os.path.join(*path_split[:-2], f"val_{epoch}", "classifier")
@@ -311,7 +311,7 @@ def validate(val_loader, model, classifier, criterion, opt):
                       'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                       'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
                       'Acc@1 {top1.val:.3f} ({top1.avg:.3f})\t'
-                      'Acc@1 {top5.val:.3f} ({top5.avg:.3f})'.format(
+                      'Acc@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
                        idx, len(val_loader), batch_time=batch_time,
                        loss=losses, top1=top1, top5=top5))
 
@@ -383,7 +383,7 @@ def main():
 
     # add classifier training details to the run.md file
     create_classifier_training_plots(path_class=os.path.join(opt.model_path, opt.model_name))
-    add_class_to_run_md(path_class=os.path.join(opt.model_path, opt.model_name), best_acc=best_acc, md_file=opt.md_file)
+    create_classifier_csv_file(opt=opt, best_acc=best_acc.cpu().item(), csv_file=os.path.join(opt.model_path, opt.model_name, "params.csv"))
 
 
 if __name__ == '__main__':
