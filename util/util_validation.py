@@ -892,7 +892,8 @@ def compute_miss_classified_dict(root_model, dataset, dataset_classifier, cuda_d
 
 
 def compute_exclude_dict(models_dict, dataset_stConflict, cuda_device):
-    root_orig_dict = {"./datasets/adaIN/shape_texture_conflict_animals10/": "animals10_diff_-1"}
+    root_orig_dict = {"./datasets/adaIN/shape_texture_conflict_animals10_two/": "animals10_diff_-1",
+                      "./datasets/adaIN/shape_texture_conflict_animals10_many/": "animals10_diff_-1"}
     dataset_orig = root_orig_dict[dataset_stConflict]
     classes = get_classes(dataset_orig)
 
@@ -979,18 +980,26 @@ def shape_texture_predictions(model, classifier, conflict_dataloader, cuda_devic
 
 
 def shape_texture_conflict_bias(df_pred, shape="shape_class", texture="texture_class", pred="pred_class"):
-    acc = len(df_pred.query(f"{shape} == {pred} or {texture} == {pred}")) / len(df_pred)
-    acc_shape = len(df_pred.query(f"{shape} == {pred}")) / len(df_pred)
-    acc_texture = len(df_pred.query(f"{texture} == {pred}")) / len(df_pred)
+    if len(df_pred) > 0:
+        acc = len(df_pred.query(f"{shape} == {pred} or {texture} == {pred}")) / len(df_pred)
+        acc_shape = len(df_pred.query(f"{shape} == {pred}")) / len(df_pred)
+        acc_texture = len(df_pred.query(f"{texture} == {pred}")) / len(df_pred)
+    else:
+        acc, acc_shape, acc_texture = 0.0, 0.0, 0.0
 
-    shape_bias = acc_shape / acc
+    if acc != 0.0:
+        shape_bias = acc_shape / acc
+    else:
+        shape_bias = np.nan
     
     return shape_bias, acc, acc_shape, acc_texture
 
 
-def evaluate_shape_texture_conflict(models_dict, dataset_stConflict, cuda_device):
-    print("Get the union over all miss classified images")
-    exclude_original_dict = compute_exclude_dict(models_dict, dataset_stConflict, cuda_device)
+def evaluate_shape_texture_conflict(models_dict, dataset_stConflict, cuda_device, exclude_miss_classified=False):
+    exclude_original_dict = None
+    if exclude_miss_classified:
+        print("Get the union over all miss classified images")
+        exclude_original_dict = compute_exclude_dict(models_dict, dataset_stConflict, cuda_device)
 
     print("Get predictions for shape texture cue conflict dataset")
     pred_dict = dict()
@@ -1038,43 +1047,60 @@ def compute_shape_biases(pred_dict, classes):
     for m in pred_dict:
         shape_bias, acc, acc_shape, acc_texture = shape_texture_conflict_bias(df_pred=pred_dict[m])
         
-        bias_dict[m] = {"shape_bias": shape_bias, "acc": acc, "acc_shape": acc_shape, "acc_texture": acc_texture}
-
         class_bias_dict = dict()
         for l,c in enumerate(classes):
-            c_s_bias, c_acc, c_acc_shape, c_acc_texture = shape_texture_conflict_bias(pred_dict[m].query(f"shape_class == {l} or texture_class == {l}"))
+            c_s_bias, c_acc, c_acc_shape, c_acc_texture = shape_texture_conflict_bias(pred_dict[m].query(f"pred_class == {l}"))
             class_bias_dict[c] = {"shape_bias": c_s_bias, "acc": c_acc, "acc_shape": c_acc_shape, "acc_texture": c_acc_texture}
         class_biasses[m] = pd.DataFrame.from_dict(class_bias_dict)
+
+        acc_b, acc_b_shape, acc_b_texture = class_biasses[m].loc[["acc", "acc_shape", "acc_texture"]].mean(axis=1).values
+        shape_bias_b = acc_b_shape / acc_b
+
+        bias_dict[m] = {"shape_bias": shape_bias, "acc": acc, "acc_shape": acc_shape, "acc_texture": acc_texture,
+                        "shape_bias_b": shape_bias_b, "acc_b": acc_b, "acc_b_shape": acc_b_shape, "acc_b_texture": acc_b_texture}
 
     df_bias = pd.DataFrame.from_dict(bias_dict)
 
     return df_bias, class_biasses
 
 
-def plot_shape_texture_conflict_bias(class_biasses, df_bias, ax=None):
+def plot_shape_texture_conflict_bias(class_biasses, df_bias, ax=None, balanced=False):
+    tag_sb = "shape_bias"
+    title = "Shape Bias"
+    if balanced:
+        tag_sb = "shape_bias_b"
+        title = "Balanced Shape Bias"
+
     if not ax:
         fig, ax = plt.subplots()
 
     model_names = list(class_biasses.keys())
-    classes = class_biasses[model_names[0]].columns
+    classes = class_biasses[model_names[0]].columns[::-1]
 
     yMin = -0.5
     yMax = len(classes) - 0.5
 
-    for m in class_biasses:
-        ax.scatter(x=class_biasses[m].iloc[0].values, y=classes, label=f"{m} (shape bias: {df_bias[m]['shape_bias']:.2f})")
-    ax.vlines(df_bias.loc["shape_bias"].values, ymin=-0.5, ymax=9.5, colors=[plt.colormaps["tab10"](i) for i in range(len(model_names))])
+    markers = ['s', 'D', 'o', 'v', 'X', 'p', '*', 'P', 'x', '+']
+    marker_sizes = [100-(i*(50//len(class_biasses))) for i in range(len(class_biasses))]
+    for i,m in enumerate(class_biasses):
+        ax.scatter(x=class_biasses[m].iloc[0].values[::-1], y=classes, s=marker_sizes[i], marker=markers[i],
+                   label=f"{m} ({tag_sb}: {df_bias[m][tag_sb]:.2f})")
+    ax.vlines(df_bias.loc[tag_sb].values, ymin=-0.5, ymax=9.5, colors=[plt.colormaps["tab10"](i) for i in range(len(model_names))])
 
-    ax.set_xlabel("shape bias")
+    ax.set_xlabel(tag_sb)
     ax.set_xticks(ticks=np.arange(start=0, stop=1.1, step=0.1))
     ax.set_yticks(ticks=np.arange(len(classes)), labels=classes)
-    ax.set_xlim(0, 1)
+    ax.set_xlim(-0.02, 1.02)
     ax.set_ylim(yMin, yMax)
     ax.legend(loc='upper center', bbox_to_anchor=(0.5,1.05 + len(model_names)*0.0625))
-    ax.set_title("Shape Bias", y=1.05 + len(model_names)*0.0625)
+    ax.set_title(title, y=1.05 + len(model_names)*0.0625)
 
 
-def plot_class_accuracies(class_biasses, df_bias, ax=None):
+def plot_class_accuracies(class_biasses, df_bias, ax=None, balanced=False):
+    tag_acc = "acc"
+    if balanced:
+        tag_acc = "acc_b"
+
     if not ax:
         fig, ax = plt.subplots()
 
@@ -1082,17 +1108,28 @@ def plot_class_accuracies(class_biasses, df_bias, ax=None):
 
     df_class_acc =pd.DataFrame()
     for m in class_biasses:
-        df_class_acc[m] = class_biasses[m].loc['acc']
+        df_class_acc[m] = class_biasses[m].loc["acc"]
+    df_class_acc.loc[tag_acc] = df_bias.loc[tag_acc]
 
-    df_class_acc.plot.barh(ax=ax)
+    df_class_acc.plot.barh(ax=ax, width=0.85)
     ax.set_xlabel("accuracy")
-    ax.set_xlim(0, 1)
-    ax.legend([f"{m} (acc: {100*df_bias[m]['acc']:.2f}%)" for m in model_names], 
-              loc='upper center', bbox_to_anchor=(0.5,1.05 + len(class_biasses)*0.0625))
+    ax.set_xticks(ticks=np.arange(start=0, stop=1.1, step=0.1))
+    ax.set_xlim(0, 1.02)
+    ax.set_ylim(len(df_class_acc) - 0.3, -0.7)
+    ax.legend([f"{m} ({tag_acc}: {100*df_bias[m][tag_acc]:.2f}%)" for m in model_names], 
+              loc="upper center", bbox_to_anchor=(0.5,1.05 + len(class_biasses)*0.0625))
     ax.set_title("Class Accuracies", y=1.05 + len(class_biasses)*0.0625)
 
 
-def plot_class_accuracies_stacked(class_biasses, ax=None):
+def plot_class_accuracies_stacked(class_biasses, df_bias, ax=None, balanced=False):
+    tag_acc = "acc"
+    tag_acc_shape = "acc_shape"
+    tag_acc_texture = "acc_texture"
+    if balanced:
+        tag_acc = "acc_b"
+        tag_acc_shape = "acc_b_shape"
+        tag_acc_texture = "acc_b_texture"
+
     if not ax:
         fig, ax = plt.subplots()
 
@@ -1102,13 +1139,19 @@ def plot_class_accuracies_stacked(class_biasses, ax=None):
     for m in class_biasses:
         df_class_acc[f"{m}_acc_shape"] = class_biasses[m].loc['acc_shape']
         df_class_acc[f"{m}_acc_texture"] = class_biasses[m].loc['acc_texture']
+    df_class_acc.loc[tag_acc, [f"{m}_acc_shape" for m in class_biasses]] = df_bias.rename(columns=dict(zip(class_biasses,
+                                                                                                         [f"{m}_acc_shape" for m in class_biasses]))).loc[tag_acc_shape]
+    df_class_acc.loc[tag_acc, [f"{m}_acc_texture" for m in class_biasses]] = df_bias.rename(columns=dict(zip(class_biasses,
+                                                                                                           [f"{m}_acc_texture" for m in class_biasses]))).loc[tag_acc_texture]
 
     cmap = plt.colormaps["tab20"]
     for i,m in enumerate(model_names):
-        df_class_acc[[f"{m}_acc_shape", f"{m}_acc_texture"]].plot.barh(stacked=True, ax=ax, position=i, width=0.8/len(model_names), color=[cmap(2*i), cmap(2*i+1)])
+        df_class_acc[[f"{m}_acc_shape", f"{m}_acc_texture"]].plot.barh(stacked=True, ax=ax, position=-i+(len(model_names)/2),
+                                                                       width=0.8/len(model_names), color=[cmap(2*i), cmap(2*i+1)])
 
     ax.set_xlabel("accuracy")
+    ax.set_xticks(ticks=np.arange(start=0, stop=1.1, step=0.1))
     ax.set_xlim(0, 1)
-    ax.set_ylim(-1, len(df_class_acc) - 0.5)
+    ax.set_ylim(len(df_class_acc) - 0.3, -0.7)
     ax.legend(ncols=2, loc='upper center', bbox_to_anchor=(0.5,1.05 + len(class_biasses)*0.0625))
     ax.set_title("Class Accuracies", y=1.05 + len(class_biasses)*0.0625)
