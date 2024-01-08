@@ -22,7 +22,7 @@ class SupConLoss(nn.Module):
         self.contrast_mode = contrast_mode
         self.base_temperature = base_temperature
 
-    def forward(self, features, labels=None, mask=None, hybrid:bool=False):
+    def forward(self, features, labels=None, mask=None, related_factor=1.0, hybrid:bool=False):
         """Compute loss for model. If both `labels` and `mask` are None,
         it degenerates to SimCLR unsupervised loss:
         https://arxiv.org/pdf/2002.05709.pdf
@@ -105,7 +105,11 @@ class SupConLoss(nn.Module):
         log_prob = logits - torch.log(exp_logits.sum(1, keepdim=True))
 
         # compute mean of log-likelihood over positive
-        mean_log_prob_pos = (mask * log_prob).sum(1) / mask.sum(1)
+        if related_factor == 1.0:
+            mean_log_prob_pos = (mask * log_prob).sum(1) / mask.sum(1)
+        else:
+            mask_factor = torch.ones((batch_size,batch_size), dtype=torch.float32).fill_diagonal_(related_factor).to(device).repeat(anchor_count, contrast_count).fill_diagonal_(1.0)
+            mean_log_prob_pos = (mask * mask_factor * log_prob).sum(1) / (mask * mask_factor).sum(1)
 
         # loss
         loss = - (self.temperature / self.base_temperature) * mean_log_prob_pos

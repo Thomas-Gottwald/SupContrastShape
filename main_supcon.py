@@ -59,6 +59,8 @@ def parse_option():
     # method
     parser.add_argument('--method', type=str, default='SupCon',
                         choices=['SupCon', 'SimCLR', 'SupConHybrid'], help='choose method')
+    parser.add_argument('--related_factor', type=float, default=1.0,
+                        help='factor to adjust the effect of the related positives in the supCon loss')
 
     # temperature
     parser.add_argument('--temp', type=float, default=0.07,
@@ -112,9 +114,14 @@ def parse_option():
     for it in iterations:
         opt.lr_decay_epochs.append(int(it))
 
-    opt.model_name = '{}_{}_{}_lr_{}_decay_{}_bsz_{}_temp_{}_trial_{}'.\
-        format(opt.method, opt.dataset, opt.model, opt.learning_rate,
-               opt.weight_decay, opt.batch_size, opt.temp, opt.trial)
+    if opt.related_factor == 1.0:
+        opt.model_name = '{}_{}_{}_lr_{}_decay_{}_bsz_{}_temp_{}_trial_{}'.\
+            format(opt.method, opt.dataset, opt.model, opt.learning_rate,
+                   opt.weight_decay, opt.batch_size, opt.temp, opt.trial)
+    else:
+        opt.model_name = '{}_{}_{}_{}_lr_{}_decay_{}_bsz_{}_temp_{}_trial_{}'.\
+            format(opt.method, opt.related_factor, opt.dataset, opt.model, opt.learning_rate,
+                   opt.weight_decay, opt.batch_size, opt.temp, opt.trial)
 
     # add identifier tag to model name
     if opt.tag != '':
@@ -277,7 +284,7 @@ def train(train_loader, model, criterion, optimizer, epoch, opt):
         f1, f2 = torch.split(features, [bsz, bsz], dim=0)
         features = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1)], dim=1)
         if opt.method == 'SupCon':
-            loss = criterion(features, labels)
+            loss = criterion(features, labels, related_factor=opt.related_factor)
         elif opt.method == 'SimCLR':
             loss = criterion(features)
         elif opt.method == 'SupConHybrid':

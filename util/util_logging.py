@@ -154,8 +154,6 @@ def open_csv_file(csv_file):
     return params
 
 
-
-
 # run.md file for the trained models
 def create_run_md(opt, mode="SupCon"):
     """
@@ -189,9 +187,9 @@ def create_run_md(opt, mode="SupCon"):
                     "|--|--|--|--|--|--|--|--|--|\n",
                     f"|{opt.dataset}|{mean}|{std}|{opt.size}|{opt.aug}|{opt.resizedCrop}|{opt.horizontalFlip}|{opt.colorJitter}|{opt.grayscale}|\n\n",
                     "#### Training\n\n",
-                    "| model | method | temp | learning rate | lr decay epochs | lr decay rate | weight decay | momentum | batch size | epochs | cosine | warm |\n",
-                    "|--|--|--|--|--|--|--|--|--|--|--|--|\n",
-                    f"|{opt.model}|{opt.method}|{opt.temp}|{opt.learning_rate}|{opt.lr_decay_epochs}|{opt.lr_decay_rate}|{opt.weight_decay}|{opt.momentum}|{opt.batch_size}|{opt.epochs}|{opt.cosine}|{opt.warm}|\n\n",
+                    "| model | method | related_factor | temp | learning rate | lr decay epochs | lr decay rate | weight decay | momentum | batch size | epochs | cosine | warm |\n",
+                    "|--|--|--|--|--|--|--|--|--|--|--|--|--|\n",
+                    f"|{opt.model}|{opt.method}|{opt.related_factor}|{opt.temp}|{opt.learning_rate}|{opt.lr_decay_epochs}|{opt.lr_decay_rate}|{opt.weight_decay}|{opt.momentum}|{opt.batch_size}|{opt.epochs}|{opt.cosine}|{opt.warm}|\n\n",
                     "#### Loging\n\n",
                     "| print freq | save freq | num workers | trail | tag |\n",
                     "|--|--|--|--|--|\n",
@@ -226,6 +224,8 @@ def create_run_md(opt, mode="SupCon"):
     else:
         raise ValueError(mode)
 
+    # TODO change the order of creation (i.e. first csv than use it to create the md file)
+    create_csv_file_training(opt, os.path.join(opt.model_path, opt.model_name, "params.csv"))
 
     with open(os.path.join(opt.model_path, opt.model_name, "run.md"), "w") as f:
         f.writelines(lines)

@@ -82,7 +82,23 @@ Contrastive training:
 CUDA_VISIBLE_DEVICES=1 nohup python main_supcon.py --dataset animals10_diff_-1+4000 --data_folder ./datasets/animals10_diff/-1/train/ --diff_folder ./datasets/animals10_diff/4000/train/ --aug sameResizedCrop sameHorizontalFlip colorJitter grayscale --learning_rate 0.125 --temp 0.1 --cosine --model resnet18 --epochs 300 --size 300 --batch_size 26 --method SupCon --mean "(0.3816, 0.3683, 0.3052)" --std "(0.3281, 0.3198, 0.3055)" --tag colorAugSameShapeAug > supCon_colorAugSameShapeAug.out &
 ```
 
+## Supervised Contrastive Learning with Factor with animals10_diff
+
+**Resnet18, batchsize: 26, learning rate: 0.125, epochs: 300, Factor 5, colorJitter, grayscale, sameResizedCrop and sameHorizontalFlip Augmentations**
+
+Contrastive training:
+```
+CUDA_VISIBLE_DEVICES=2 nohup python main_supcon.py --dataset animals10_diff_-1+4000 --data_folder ./datasets/animals10_diff/-1/train/ --diff_folder ./datasets/animals10_diff/4000/train/ --aug sameResizedCrop sameHorizontalFlip colorJitter grayscale --learning_rate 0.125 --temp 0.1 --cosine --model resnet18 --epochs 300 --size 300 --batch_size 26 --method SupCon --related_factor 5.0 --mean "(0.3816, 0.3683, 0.3052)" --std "(0.3281, 0.3198, 0.3055)" --tag factor5cAugSameSAug > supCon_factor5cAugSameSAug.out &
+```
+
 ## Cross Entropy Learning with animals10_diff
+
+**Resnet18, batchsize: 26, learning rate: 0.125, epochs: 500 original images with all augmentations**
+
+Training:
+```
+CUDA_VISIBLE_DEVICES=1 nohup python main_ce.py --dataset animals10_diff_-1 --data_folder ./datasets/animals10_diff/-1/train/ --test_folder ./datasets/animals10_diff/-1/test/ --aug resizedCrop horizontalFlip colorJitter grayscale --num_classes 10 --learning_rate 0.125 --cosine --model resnet18 --epochs 500 --size 300 --batch_size 26 --batch_size_val 26 --mean "(0.3816, 0.3683, 0.3052)" --std "(0.3281, 0.3198, 0.3055)" --tag origAllAug > supCE_origAllAug.out &
+```
 
 **Resnet18, batchsize: 26, learning rate: 0.125, epochs: 500**
 
