@@ -18,7 +18,7 @@ from networks.resnet_big import SupConResNet
 from losses import SupConLoss
 from util.util_diff import DiffLoader, DiffTransform
 from util.util_diff import SameTwoRandomResizedCrop, SameTwoColorJitter, SameTwoApply
-from util.util_logging import create_run_md, create_training_plots, add_train_to_run_md
+from util.util_logging import create_csv_file_training, create_run_md, create_training_plots
 
 
 def parse_option():
@@ -322,7 +322,8 @@ def main():
     opt = parse_option()
 
     # create a run.md file containing the training parameters
-    create_run_md(opt)
+    create_csv_file_training(opt, os.path.join(opt.model_path, opt.model_name, "params.csv"))
+    create_run_md(os.path.join(opt.model_path, opt.model_name))
 
     # build data loader
     train_loader = set_loader(opt)
@@ -365,7 +366,7 @@ def main():
 
     # add training details to the run.md file
     create_training_plots(path=os.path.join(opt.model_path, opt.model_name))
-    add_train_to_run_md(path=os.path.join(opt.model_path, opt.model_name))
+    create_run_md(os.path.join(opt.model_path, opt.model_name))
 
 
 if __name__ == '__main__':

@@ -4,7 +4,9 @@ import re
 import csv
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 import seaborn
+from sklearn.metrics import ConfusionMatrixDisplay
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 
 seaborn.set_theme(style="darkgrid")
@@ -25,7 +27,7 @@ def open_tensorboard(path):
     Parameters
     ---------
     path: str
-        path to the tenorboard log file (even*) in the form <path>/tensorboard/event*
+        path to the tenorboard log file (event...) in the form <path>/tensorboard/event...
     """
     tb_path = glob.glob(os.path.join(path, "tensorboard", 'event*'))
     if len(tb_path) < 1:
@@ -154,381 +156,328 @@ def open_csv_file(csv_file):
     return params
 
 
+# mark down files for nicer visualization of training parameters and validation results
+def md_table_from_params(keys, value_dict):
+    table_head = "|"
+    table_middle = "|"
+    table_values = "|"
+    for k in keys:
+        if k in value_dict:
+            table_head += f"{k}|"
+            table_middle += "--|"
+            table_values += f"{value_dict[k]}|"
+    table_head += "\n"
+    table_middle += "\n"
+    table_values += "\n\n"
+
+    return [table_head, table_middle, table_values]
+
+
+def md_table_from_dict(value_dict, keys=None):
+    df_table = pd.DataFrame.from_dict(value_dict)
+    if keys is not None:
+        df_table = df_table[keys]
+
+    table_str = df_table.to_markdown(index=False)
+    table_lines = [t_line + "\n" for t_line in table_str.split("\n")]
+    table_lines[-1] += "\n"
+
+    return table_lines
+
 # run.md file for the trained models
-def create_run_md(opt, mode="SupCon"):
-    """
-    Creates a run.md file containing the training parameters
+def create_run_md(path_folder):
+    params_dataset = ["dataset", "mean", "std", "size", "num_classes", "aug", "resizedCrop", "horizontalFlip", "colorJitter", "grayscale", "diff_p"]
+    params_training = ["model", "method", "related_factor", "temp", "batch_size", "batch_size_val", "epochs", "learning_rate", "momentum", "lr_decay_epochs", "lr_decay_rate", "weight_decay", "cosine", "warm"]
+    params_other = ["tag", "trial", "save_freq", "print_freq", "num_workers", "num_workers_val"]
 
-    Parameters
-    ---------
-    opt
-        parse options of the training call
-    mode: str
-        ether "SupCon" for (supervised) contrastive learning
-        of "SupCE" for normal supervised crossentropy loss
-    """
-    if opt.dataset == 'cifar10':
-        mean = (0.4914, 0.4822, 0.4465)
-        std = (0.2023, 0.1994, 0.2010)
-    elif opt.dataset == 'cifar100':
-        mean = (0.5071, 0.4867, 0.4408)
-        std = (0.2675, 0.2565, 0.2761)
+    params_csv = open_csv_file(os.path.join(path_folder, "params.csv"))
+
+    # set the title
+    if "method" in params_csv:
+        title = params_csv["method"]
     else:
-        mean = opt.mean
-        std = opt.std
+        title = "CE"
+    title += f" {params_csv['dataset']} {params_csv['tag']}"
 
-    if mode == "SupCon":
-        lines = [
-                    "<!-- param,tb -->\n"
-                    "# Contrastive Training\n\n",
-                    "## Training Parameters\n\n",
-                    "#### Dataset\n\n",
-                    "| dataset | mean | std | size | aug | resizedCrop | horizontalFlip | colorJitter | grayscale |\n",
-                    "|--|--|--|--|--|--|--|--|--|\n",
-                    f"|{opt.dataset}|{mean}|{std}|{opt.size}|{opt.aug}|{opt.resizedCrop}|{opt.horizontalFlip}|{opt.colorJitter}|{opt.grayscale}|\n\n",
-                    "#### Training\n\n",
-                    "| model | method | related_factor | temp | learning rate | lr decay epochs | lr decay rate | weight decay | momentum | batch size | epochs | cosine | warm |\n",
-                    "|--|--|--|--|--|--|--|--|--|--|--|--|--|\n",
-                    f"|{opt.model}|{opt.method}|{opt.related_factor}|{opt.temp}|{opt.learning_rate}|{opt.lr_decay_epochs}|{opt.lr_decay_rate}|{opt.weight_decay}|{opt.momentum}|{opt.batch_size}|{opt.epochs}|{opt.cosine}|{opt.warm}|\n\n",
-                    "#### Loging\n\n",
-                    "| print freq | save freq | num workers | trail | tag |\n",
-                    "|--|--|--|--|--|\n",
-                    f"|{opt.print_freq}|{opt.save_freq}|{opt.num_workers}|{opt.trial}|{opt.tag}|\n\n",
-                    "#### Tensorboard\n\n",
-                    "```\n",
-                    f"tensorboard --logdir={opt.tb_folder}\n",
-                    "```\n\n",
-                ]
-    elif mode == "SupCE":
-        lines = [
-                    "<!-- param,tb -->\n"
-                    "# Contrastive Training\n\n",
-                    "## Training Parameters\n\n",
-                    "#### Dataset\n\n",
-                    "| dataset | mean | std | size | num classes | aug | resizedCrop | horizontalFlip | colorJitter | grayscale |" + (" diff_p |" if opt.diff_folder else "") + "\n",
-                    "|--|--|--|--|--|--|--|--|--|--|" + ("--|" if opt.diff_folder else "") + "\n",
-                    f"|{opt.dataset}|{mean}|{std}|{opt.size}|{opt.n_cls}|{opt.aug}|{opt.resizedCrop}|{opt.horizontalFlip}|{opt.colorJitter}|{opt.grayscale}|" + (f"{opt.diff_p}|" if opt.diff_folder else "") + "\n\n",
-                    "#### Training\n\n",
-                    "| model | learning rate | lr decay epochs | lr decay rate | weight decay | momentum | batch size | batch size val | epochs | cosine | warm |\n",
-                    "|--|--|--|--|--|--|--|--|--|--|--|\n",
-                    f"|{opt.model}|{opt.learning_rate}|{opt.lr_decay_epochs}|{opt.lr_decay_rate}|{opt.weight_decay}|{opt.momentum}|{opt.batch_size}|{opt.batch_size_val}|{opt.epochs}|{opt.cosine}|{opt.warm}|\n\n",
-                    "#### Loging\n\n",
-                    "| print freq | save freq | num workers | num workers val | trail | tag |\n",
-                    "|--|--|--|--|--|--|\n",
-                    f"|{opt.print_freq}|{opt.save_freq}|{opt.num_workers}|{opt.num_workers_val}|{opt.trial}|{opt.tag}|\n\n",
-                    "#### Tensorboard\n\n",
-                    "```\n",
-                    f"tensorboard --logdir={opt.tb_folder}\n",
-                    "```\n\n",
-                ]
-    else:
-        raise ValueError(mode)
+    lines = [f"# {title}\n\n",
+             "## Training Parameters\n\n"]
+    
+    # dataset parameters
+    lines.append("#### Dataset\n\n")
+    lines.extend(md_table_from_params(keys=params_dataset, value_dict=params_csv))
 
-    # TODO change the order of creation (i.e. first csv than use it to create the md file)
-    create_csv_file_training(opt, os.path.join(opt.model_path, opt.model_name, "params.csv"))
+    # training parameters
+    lines.append("#### Training\n\n")
+    lines.extend(md_table_from_params(keys=params_training, value_dict=params_csv))
 
-    with open(os.path.join(opt.model_path, opt.model_name, "run.md"), "w") as f:
+    # other parameters
+    lines.append("#### Other\n\n")
+    lines.extend(md_table_from_params(keys=params_other, value_dict=params_csv))
+
+    # tensorboard path
+    lines.extend(["#### Tensorboard\n\n",
+                  "```\n",
+                  f"tensorboard --logdir={params_csv['tb_folder']}\n"
+                  "```\n\n"])
+    
+    # model checkpoint path
+    lines.extend(["#### Model checkpoints\n\n",
+                  "```\n",
+                  f"{params_csv['save_folder']}\n",
+                  "```\n\n"])
+    
+    # Training plots
+    tb_plots = [plot.split('/')[-1] for plot in glob.glob(os.path.join(path_folder, "tensorboard", "*.png"))]
+    if "learning_rate.png" in tb_plots and "loss.png" in tb_plots:
+        lines.extend(["## Training\n\n",
+                      "Leaning rate | Loss\n",
+                      ":--:|:--:\n",
+                      "![plot of learning rate scheduling](./tensorboard/learning_rate.png)|![plot of training loss](./tensorboard/loss.png)\n\n"])
+    if "train_top1.png" in tb_plots and "val_top1.png" in tb_plots:
+        lines.append("## Training Validation\n\n")
+        
+        df_tb = open_tensorboard(path_folder)
+        if df_tb is not None:
+            lines.append(f"**best top-1 validation accuracy: {df_tb['val_acc'].max():.2f}**\n")
+
+        lines.extend(["top-1 training accuracy | top-1 validation accuracy\n",
+                      ":--:|:--:\n",
+                      "![plot of classifier top-1 training acc](./tensorboard/train_top1.png)|![plot of classifier top-1 validation acc](./tensorboard/val_top1.png)\n\n"])
+
+    # plots for additionally trained classifier (with same/similar conditions as encoder)
+    classifier_plots = glob.glob(os.path.join(path_folder, "val_*", "classifier", "*", "tensorboard", "*.png"))
+    if len(classifier_plots) > 0:
+        lines.append("## Classifier\n\n")
+
+        epochs_classifier = [e.replace(' ', '') for e in sorted(set([f"{plot_path.split('/')[-5].replace('val_', ''):>3}"for plot_path in classifier_plots]))]
+
+        for e in epochs_classifier:
+            c_plot_paths = glob.glob(os.path.join(path_folder, f"val_{e}", "classifier", "*", "tensorboard", f"*.png"))
+
+            if len(c_plot_paths) == 2:
+                lines.append(f"### Epoch {e}\n\n")
+
+                c_plot_paths_split = c_plot_paths[0].split('/')
+                df_tb = open_tensorboard(os.path.join(*c_plot_paths_split[:-2]))
+                if df_tb is not None:
+                    lines.append(f"**best top-1 validation accuracy: {df_tb['val_acc'].max():.2f}**\n")
+
+                lines.extend(["top-1 training accuracy | top-1 validation accuracy\n",
+                              ":--:|:--:\n",
+                              f"![plot of classifier training loss]({os.path.join(*c_plot_paths_split[-5:-1], 'train_loss.png')})|",
+                              f"![plot of classifier top-1 validation acc]({os.path.join(*c_plot_paths_split[-5:-1], 'val_top1.png')})\n\n"])
+        
+    # write the markdown file
+    with open(os.path.join(path_folder, "run.md"), "w") as f:
         f.writelines(lines)
 
 
-def create_val_md(path_val_md, dataset_val):
-    """
-    Creates markdown file to store validation with a different dataset.
+# cm.md for classification accuracies and plots of confusion matrices
+def save_confusion_matrix(C, classes, path, title="Confusion Matrix"):
+    # save the confusion matrix as csv file
+    df_cm = pd.DataFrame(C)
+    df_cm.to_csv(path.replace(".png", ".csv"), index=False)
 
-    Parameters
-    ---------
-    path_val_md: str
-        path the markdown validation file.
-        Needs to end with '.md' and be at the same location as run.md
-    dataset_val: str
-        name of the dataset used for validation
-    """
-    if os.path.exists(path_val_md):
-        print(f"validation md file already exits: {path_val_md}")
-        return
+    # save plot of the confusion matrix
+    seaborn.set_theme(style="ticks")
 
-    lines = [
-                "<!-- val -->\n",
-                f"# Validation with {dataset_val}\n\n"
-    ]
+    disp = ConfusionMatrixDisplay(C, display_labels=classes)
+    disp.plot(xticks_rotation=(45 if len(classes)<=10 else 90))
+    for labels in disp.text_.ravel():
+        labels.set_fontsize(10)
+    disp.ax_.set_title(title)
+    disp.figure_.tight_layout(pad=0.5)
 
-    with open(path_val_md, "w") as f:
-        f.writelines(lines)
+    plt.savefig(path)
 
 
-def set_path_md(path):
-    if len(path) > 3 and path[-3:] == '.md':
-        return path
+def load_confusion_matrix(path):
+    df_cm = pd.read_csv(path)
+    C = df_cm.to_numpy()
+
+    return C
+
+
+def compute_accuracies_form_cm(C):
+    c_lens = C.sum(1)
+    all_len = C.sum()
+
+    # accuracy
+    acc = 0.0
+    for i in range(len(c_lens)):
+        acc += C[i,i]
+    acc *= 100/all_len
+    # balanced accuracy
+    acc_b = 0.0
+    for i, n in enumerate(c_lens):
+        acc_b += C[i,i] / n
+    acc_b *= 100/len(c_lens)
+
+    return acc, acc_b
+
+
+def create_cm_md(path_folder):
+    params_csv = open_csv_file(os.path.join(path_folder, "params.csv"))
+
+    # set the title
+    if "method" in params_csv:
+        title = f"Classification validation: {params_csv['method']}"
     else:
-        return os.path.join(path, 'run.md')
+        title = "Classification validation: CE"
+    title += f" {params_csv['dataset']} {params_csv['tag']}"
 
-
-def open_run_md(path):
-    with open(set_path_md(path), 'r') as f:
-        lines = f.readlines()
-    head = lines[0].replace("<!-- ", '').replace(" -->\n", '').split(',')
-
-    return head, lines
-
-
-def insert_into_run_md(path, head, lines, inset_idx, text_entry, head_idx, head_entry):
-    lines.insert(inset_idx, text_entry)
-    head.insert(head_idx, head_entry)
-    lines[0] = "<!-- " + ','.join(head) + " -->\n"
-
-    with open(set_path_md(path), 'w') as f:
-        f.writelines(lines)
-
-
-def get_insert_line(entry, head, epoch="last"):
-    lines_dict = {"param": 22, "tb": 6, "train": 6, "val": 2, "epoch": 2, "tsne": 6, "class": 7, "cm": 7}
-    re_pattern = {"param": "param", "tb": "tb", "train": "train", "val": "val", "epoch": "last|[0-9]+", "tsne": "tsne(last|[0-9]+)", "class": "class(last|[0-9]+)", "cm": "cm(last|[0-9]+)"}
-    entry_dict = {"train": (2,""), "val": (3,""), "epoch": (8,""), "tsne": (8,"last|[0-9]+"), "class": (8,"(tsne)?(last|[0-9]+)"), "cm": (8,"(tsne|class)?(last|[0-9]+)")}
-
-    num_head, re_check = entry_dict[entry]
-    new_epoch = f"{epoch}"
-
-    count_lines = 1
-    count_entries = 0
-    for h in head:
-        for n in list(lines_dict)[:num_head]:
-            if re.fullmatch(re_pattern[n], h):
-
-                if n in ["epoch", "tsne", "class", "cm"]:
-                    check = re.fullmatch(re_check, h)
-                    numbers = re.search("[0-9]+", h)
-                    if new_epoch != "last" and numbers:
-                        val = int(numbers.group(0))
-                        if val < int(new_epoch) or (check and val <= int(new_epoch)):
-                            count_lines += lines_dict[n]
-                            count_entries += 1
-                    elif new_epoch != "last" or (not numbers and check):
-                        count_lines += lines_dict[n]
-                        count_entries += 1
-                else:
-                    count_lines += lines_dict[n]
-                    count_entries += 1
-    return count_lines, count_entries
-
-
-def add_val_to_run_md(path):
-    head, lines = open_run_md(path)
-
-    head_entry = "val"
-    if head_entry in head:
-        print(f"Validation headline already in {set_path_md(path)}.")
-        return
-
-    inset_idx, head_idx = get_insert_line("val", head)
-
-    text_entry = "# Validation\n\n"
-
-    insert_into_run_md(path, head, lines, inset_idx, text_entry, head_idx, head_entry)
-
-
-def add_epoch_to_run_md(path, epoch):
-    head, lines = open_run_md(path)
-
-    head_entry = f"{epoch}"
-    if head_entry in head:
-        print(f"Epoch {epoch} headline already in {set_path_md(path)}.")
-        return
-
-    if "val" not in head:
-        add_val_to_run_md(path)
-        head, lines = open_run_md(path)
-
-    inset_idx, head_idx = get_insert_line("epoch", head, epoch)
-
-    text_entry = f"## Epoch {epoch}\n\n"
-
-    insert_into_run_md(path, head, lines, inset_idx, text_entry, head_idx, head_entry)
-
-
-def add_train_to_run_md(path):
-    """Adds links plots of training learning rate and loss to the run.md file"""
-    head, lines = open_run_md(path)
-
-    head_entry = "train"
-    if head_entry in head:
-        print(f"The training info is already in {set_path_md(path)}.")
-        return
+    lines = [f"# {title}\n\n",
+             "## Accuracies\n\n"]
     
-    inset_idx, head_idx = get_insert_line("train", head)
+    # collect all accuracies anc cm plots
+    cm_csv_paths = glob.glob(os.path.join(path_folder, "val_*", "*", "cm", "cm_*.csv"))
+    datasets_cm = sorted(set([cm_path.split('/')[-3] for cm_path in cm_csv_paths]))
+    epochs_cm = [e.replace(' ', '') for e in sorted(set([f"{cm_path.split('/')[-4].replace('val_', ''):>3}"for cm_path in cm_csv_paths]))]
 
-    text_entry = "## Training\n\n"\
-               + "Learning rate | Loss\n"\
-               + ":--:|:--:\n"\
-               + "![plot of learning rate scheduling](./tensorboard/learning_rate.png)|"\
-               + "![plot of training loss](./tensorboard/loss.png)\n\n"
+    cm_plot_dict = dict()
+    for e in epochs_cm:
+        cm_plot_dict[e] = []
+    acc_dict_train = {"epoch": epochs_cm}
+    acc_dict_val = {"epoch": epochs_cm}
+    for dset in datasets_cm:
+        acc_dict_train[dset] = []
+        acc_dict_val[dset] = []
+        for e in epochs_cm:
+            cm_plot_paths = glob.glob(os.path.join(path_folder, f"val_{e}", dset, "cm", f"cm_*_epoch_{e}.png"))
+            if len(cm_plot_paths) == 2:
+                cm_plot_dict[e].append(f"#### Dataset: {dset}\n\n")
 
-    insert_into_run_md(path, head, lines, inset_idx, text_entry, head_idx, head_entry)
 
+            cm_path_train = glob.glob(os.path.join(path_folder, f"val_{e}", dset, "cm", f"cm_train_epoch_{e}.csv"))
+            if len(cm_path_train) == 1:
+                C_train = load_confusion_matrix(cm_path_train[0])
+                acc_train, acc_b_train = compute_accuracies_form_cm(C_train)
 
-def add_tsne_to_run_md(path, epoch, dataset_val=None):
-    """Adds links plots of t-SNE embeddings of a specific epoch to the run.md file"""
-    head, lines = open_run_md(path)
+                acc_dict_train[dset].append(f"{acc_train:.2f} ({acc_b_train:.2f})")
+                if len(cm_plot_paths) == 2:
+                    cm_plot_dict[e].append(f"- **Training Data: Accuracy: {acc_train:.2f}, Class Balanced Accuracy: {acc_b_train:.2f}**\n")
+            else:
+                acc_dict_train[dset].append("")
 
-    head_entry = f"tsne{epoch}"
-    if head_entry in head:
-        print(f"The t-SNE entry for epoch {epoch} is already in {set_path_md(path)}.")
-        return
-    
-    if f"{epoch}" not in head:
-        add_epoch_to_run_md(path, epoch)
-        head, lines = open_run_md(path)
+            cm_path_val = glob.glob(os.path.join(path_folder, f"val_{e}", dset, "cm", f"cm_val_epoch_{e}.csv"))
+            if len(cm_path_val) == 1:
+                C_val = load_confusion_matrix(cm_path_val[0])
+                acc_val, acc_b_val = compute_accuracies_form_cm(C_val)
 
-    inset_idx, head_idx = get_insert_line("tsne", head, epoch)
+                acc_dict_val[dset].append(f"{acc_val:.2f} ({acc_b_val:.2f})")
+                if len(cm_plot_paths) == 2:
+                    cm_plot_dict[e].append(f"- **Validation Data: Accuracy: {acc_val:.2f}, Class Balanced Accuracy: {acc_b_val:.2f}**\n")
+            else:
+                acc_dict_val[dset].append("")
 
-    if dataset_val == None:
-        val_folder = f"val_{epoch}"
+            if len(cm_plot_paths) == 2:
+                cm_plot_dict[e].extend([f"\n{dset} Trainings Data | {dset} Test Data\n",
+                                        ":--:|:--:\n",
+                                        f"![plot of confusion matrix trainings data]({os.path.join('.', f'val_{e}', dset, 'cm', f'cm_train_epoch_{e}.png')})|",
+                                        f"![plot of confusion matrix test data]({os.path.join('.', f'val_{e}', dset, 'cm', f'cm_val_epoch_{e}.png')})\n\n"])
+
+    # tables for accuracies
+    if len(acc_dict_train["epoch"]) > 0:
+        lines.append("**training data accuracies: (class balanced accuracies in brackets)**\n")
+        lines.extend(md_table_from_dict(acc_dict_train))
+    if len(acc_dict_val["epoch"]) > 0:
+        lines.append("**validation data accuracies: (class balanced accuracies in brackets)**\n")
+        lines.extend(md_table_from_dict(acc_dict_val))
+
+    # confusion matrix plots
+    for e in epochs_cm:
+        if len(cm_plot_dict[e]) > 0:
+            lines.append(f"### Epoch {e}\n\n")
+            lines.extend(cm_plot_dict[e])
+
+    # # write the markdown file
+    if len(lines) > 2:
+        with open(os.path.join(path_folder, "cm.md"), "w") as f:
+            f.writelines(lines)
+        
+
+# tSNE.md for t-SNE plots
+def create_tsne_md(path_folder):
+    params_csv = open_csv_file(os.path.join(path_folder, "params.csv"))
+
+    # set the title
+    if "method" in params_csv:
+        title = f"t-SNE Plots: {params_csv['method']}"
     else:
-        val_folder = f"val_{dataset_val}_{epoch}"
+        title = "t-SNE Plots: CE"
+    title += f" {params_csv['dataset']} {params_csv['tag']}"
 
-    text_entry = "### t-SNE Embedding\n\n"\
-               + "Training data | Test data\n"\
-               + ":--:|:--:\n"\
-               + f"![t-SNE plot of epoch {epoch} training data](./{val_folder}/embeddings/tSNE_epoch_{epoch}_train.png)|"\
-               + f"![t-SNE plot of epoch {epoch} test data](./{val_folder}/embeddings/tSNE_epoch_{epoch}_test.png)\n\n"
+    lines = [f"# {title}\n\n"]
 
-    insert_into_run_md(path, head, lines, inset_idx, text_entry, head_idx, head_entry)
+    # collect epochs and datasets
+    tsne_paths = glob.glob(os.path.join(path_folder, "val_*", "*", "embeddings", "tSNE_epoch_*.png"))
+    datasets_tsne = sorted(set([tsne_path.split('/')[-3] for tsne_path in tsne_paths]))
+    epochs_tsne = [e.replace(' ', '') for e in sorted(set([f"{tsne_path.split('/')[-4].replace('val_', ''):>3}"for tsne_path in tsne_paths]))]
+
+    # add plots to lines  
+    for e in epochs_tsne:
+        plot_lines = []
+        for dset in datasets_tsne:
+            cm_plot_paths = glob.glob(os.path.join(path_folder, f"val_{e}", dset, "embeddings", f"tSNE_epoch_{e}_*.png"))
+
+            if len(cm_plot_paths) == 2:
+                plot_lines.extend([f"#### Dataset: {dset}\n\n",
+                                   f"{dset} Trainings Data | {dset} Test Data\n",
+                                   ":--:|:--:\n",
+                                   f"![t-SNE plot of epoch last training data]({os.path.join('.', f'val_{e}', dset, 'embeddings', f'tSNE_epoch_{e}_train.png')})",
+                                   f"|![t-SNE plot of epoch last test data]({os.path.join('.', f'val_{e}', dset, 'embeddings', f'tSNE_epoch_{e}_test.png')})\n\n"])
+                
+        if len(plot_lines) > 0:
+            lines.append(f"### Epoch {e}\n\n")
+            lines.extend(plot_lines)
+
+    # write the markdown file
+    if len(lines) > 1:
+        with open(os.path.join(path_folder, "tSNE.md"), "w") as f:
+            f.writelines(lines)
 
 
-def add_class_to_run_md(path_class, best_acc, md_file=None):
-    """Adds plots of classifier train loss and val acc of a specific epoch to the run.md file"""
-    path = path_class.split('/')
-    epoch = path[-3].split('_')[-1]
-    path_plots = os.path.join(*path[-3:], "tensorboard")
-    if md_file == None:
-        path = os.path.join(*path[:-3])
+# distances.md tables of cosine distances of the feature embeddings
+def create_distances_md(path_folder):
+    params_csv = open_csv_file(os.path.join(path_folder, "params.csv"))
+
+    # set the title
+    if "method" in params_csv:
+        title = f"Feature Space Distances: {params_csv['method']}"
     else:
-        path = os.path.join(*path[:-3], md_file)
-    head, lines = open_run_md(path)
+        title = "Feature Space Distances: CE"
+    title += f" {params_csv['dataset']} {params_csv['tag']}"
 
-    head_entry = f"class{epoch}"
-    if head_entry in head:
-        print(f"The classification info for epoch {epoch} is already in {set_path_md(path)}.")
-        return
-    
-    if f"{epoch}" not in head:
-        add_epoch_to_run_md(path, epoch)
-        head, lines = open_run_md(path)
+    lines = [f"# {title}\n\n"]
 
-    inset_idx, head_idx = get_insert_line("class", head, epoch)
+    # collect epochs and datasets
+    dist_paths = glob.glob(os.path.join(path_folder, "val_*", "*", "embeddings", "*_dist_to_*.csv"))
+    datasets_1_dist = sorted(set([dist_path.split('/')[-3] for dist_path in dist_paths]))
+    datasets_2_dist = sorted(set([dist_path.split("_dist_to_")[-1].replace(".csv", '') for dist_path in dist_paths]))
+    epochs_dist = [e.replace(' ', '') for e in sorted(set([f"{dist_path.split('/')[-4].replace('val_', ''):>3}"for dist_path in dist_paths]))]
 
-    text_entry = "### Classifier\n\n"\
-               + f"**best top-1 accuracy: {best_acc:.2f}**\n"\
-               + "Training loss | top-1 accuracy\n"\
-               + ":--:|:--:\n"\
-               + f"![plot of classifier training loss]({os.path.join(path_plots, 'train_loss.png')})|"\
-               + f"![plot of classifier top-1 validation acc]({os.path.join(path_plots, 'val_top1.png')})\n\n"
-    
-    insert_into_run_md(path, head, lines, inset_idx, text_entry, head_idx, head_entry)
+    # create one distance table for each epoch
+    for e in epochs_dist:
+        dist_dict = {"Datasets": [], "Related Images": [], "Same Class": [], "All versus all": []}
+        for dset1 in datasets_1_dist:
+            for dset2 in datasets_2_dist:
+                dist_path = glob.glob(os.path.join(path_folder, f"val_{e}", dset1, "embeddings", f"{dset1}_dist_to_{dset2}.csv"))
 
+                if len(dist_path) == 1:
+                    df_dist = pd.read_csv(dist_path[0])
+                    dist_rel, dist_class, dist_all = df_dist.loc[0]
 
-def add_class_CE_to_run_md(path, best_acc):
-    """
-    Adds plots of train acc and val acc to the run.md file.
-    Only for crossentropy loss
-    """
-    head, lines = open_run_md(path)
+                    dist_dict["Datasets"].append(f"{dset1} to {dset2}")
+                    dist_dict["Related Images"].append(f"{dist_rel:.4f} ({dist_rel/dist_all:.4f})")
+                    dist_dict["Same Class"].append(f"{dist_class:.4f} ({dist_class/dist_all:.4f})")
+                    dist_dict["All versus all"].append(f"{dist_all:.4f} ({dist_all/dist_all:.4f})")
+        
+        if len(dist_dict["Datasets"]) > 0:
+            lines.extend([f"### Epoch {e}\n\n",
+                        "**(in brackets are the distances divided by the All versus all distance)**\n"])
+            lines.extend(md_table_from_dict(dist_dict))
 
-    head_entry = "classlast"
-    if head_entry in head:
-        print(f"The classification info is already in {set_path_md(path)}.")
-        return
-    
-    inset_idx, head_idx = get_insert_line("class", head)
-
-    text_entry = "## Classification\n\n"\
-               + f"**best top-1 validation accuracy: {best_acc:.2f}**\n"\
-               + "top-1 training accuracy | top-1 validation accuracy\n"\
-               + ":--:|:--:\n"\
-               + "![plot of classifier top-1 training acc](./tensorboard/train_top1.png)|"\
-               + "![plot of classifier top-1 validation acc](./tensorboard/val_top1.png)\n\n"
-    
-    insert_into_run_md(path, head, lines, inset_idx, text_entry, head_idx, head_entry)
-
-
-def add_confusion_matrix_to_run_md(path_class, acc, acc_b, train_acc, train_acc_b, md_file=None):
-    """Adds plots of the confusion matrix for training and test data to the run.md file"""
-    path = path_class.split('/')
-    epoch = path[-3].split('_')[-1]
-    path_plots = os.path.join(*path[-3:], "models")
-    if md_file == None:
-        path = os.path.join(*path[:-3])
-    else:
-        path = os.path.join(*path[:-3], md_file)
-    head, lines = open_run_md(path)
-
-    head_entry = f"cm{epoch}"
-    if head_entry in head:
-        print(f"The confusion matrix plots for epoch {epoch} are already in {set_path_md(path)}.")
-        return
-    
-    if f"{epoch}" not in head:
-        add_epoch_to_run_md(path, epoch)
-        head, lines = open_run_md(path)
-
-    inset_idx, head_idx = get_insert_line("cm", head, epoch)
-
-    text_entry = "#### Confusion Matrix\n\n"\
-               + f"**Accuracy: {acc:.2f} (train: {train_acc:.2f}), Balanced Accuracy: {acc_b:.2f} (train: {train_acc_b:.2f})**\n"\
-               + "Training | Test\n"\
-               + ":--:|:--:\n"\
-               + f"![plot of confusion matrix trainings data]({os.path.join(path_plots, f'cm_train_epoch_{epoch}.png')})|"\
-               + f"![plot of confusion matrix test data]({os.path.join(path_plots, f'cm_val_epoch_{epoch}.png')})\n\n"
-    
-    insert_into_run_md(path, head, lines, inset_idx, text_entry, head_idx, head_entry)
-
-
-# comb mark down file
-def create_comb_md(path_comb_md, path_save, dataset_1, dataset_2, all_epochs, comb_dict):
-    with open(path_comb_md, "w") as f:
-        f.write(f"# Validation with {dataset_1} and {dataset_2}\n\n")
-
-    # bring the epochs in ascending order with 'last' in first place
-    all_epochs_list = np.array(list(all_epochs))
-    epochs_idx = np.argsort([int(e) if type(try_eval(e)) is int else -1 for e in all_epochs_list])
-    all_epochs_list = all_epochs_list[epochs_idx]
-
-    for e in all_epochs_list:
-        text_entry = ""
-        if f"tSNE{e}" in comb_dict:
-            path_tsne, path_tsne_second = comb_dict[f"tSNE{e}"]
-            text_entry = text_entry\
-                    + "### t-SNE Embedding\n\n"\
-                    + f"{dataset_1} Trainings data | {dataset_1} Test data\n"\
-                    + ":--:|:--:\n"\
-                    + f"![t-SNE plot of epoch {e} training data]({path_tsne[0].replace(path_save, '.')})|![t-SNE plot of epoch {e} test data]({path_tsne[1].replace(path_save, '.')})\n\n"\
-                    + f"{dataset_2} Trainings data | {dataset_2} Test data\n"\
-                    + ":--:|:--:\n"\
-                    + f"![t-SNE plot of epoch {e} training data]({path_tsne_second[0].replace(path_save, '.')})|![t-SNE plot of epoch {e} test data]({path_tsne_second[1].replace(path_save, '.')})\n\n"
-
-        if f"cm{e}" in comb_dict and f"acc{e}" in comb_dict:
-            acc11, acc12, acc22, acc21 = comb_dict[f"acc{e}"]
-            path_cm, path_cm_comb, path_cm_second, path_cm_comb_second = comb_dict[f"cm{e}"]
-            text_entry = text_entry\
-                    + f"### Classifier trained with {dataset_1} Trainings data\n\n"\
-                    + f"**[{dataset_1}]: Accuracy: {acc11[2]:.2f} (train: {acc11[0]:.2f}), Balanced Accuracy: {acc11[3]:.2f} (train: {acc11[1]:.2f})**\n"\
-                    + f"{dataset_1} Trainings data | {dataset_1} Test data\n"\
-                    + ":--:|:--:\n"\
-                    + f"![plot of confusion matrix trainings data]({path_cm[0].replace(path_save, '.')})|![plot of confusion matrix test data]({path_cm[1].replace(path_save, '.')})\n\n"\
-                    + f"**[{dataset_2}]: Accuracy: {acc12[2]:.2f} (train: {acc12[0]:.2f}), Balanced Accuracy: {acc12[3]:.2f} (train: {acc12[1]:.2f})**\n"\
-                    + f"{dataset_2} Trainings data | {dataset_2} Test data\n"\
-                    + ":--:|:--:\n"\
-                    + f"![plot of confusion matrix trainings data]({path_cm_comb[0].replace(path_save, '.')})|![plot of confusion matrix test data]({path_cm_comb[1].replace(path_save, '.')})\n\n"\
-                    + f"### Classifier trained with {dataset_2} Trainings data\n\n"\
-                    + f"**[{dataset_2}]: Accuracy: {acc22[2]:.2f} (train: {acc22[0]:.2f}), Balanced Accuracy: {acc22[3]:.2f} (train: {acc22[1]:.2f})**\n"\
-                    + f"{dataset_2} Trainings data | {dataset_2} Test data\n"\
-                    + ":--:|:--:\n"\
-                    + f"![plot of confusion matrix trainings data]({path_cm_second[0].replace(path_save, '.')})|![plot of confusion matrix test data]({path_cm_second[1].replace(path_save, '.')})\n\n"\
-                    + f"**[{dataset_1}]: Accuracy: {acc21[2]:.2f} (train: {acc21[0]:.2f}), Balanced Accuracy: {acc21[3]:.2f} (train: {acc21[1]:.2f})**\n"\
-                    + f"{dataset_1} Trainings data | {dataset_1} Test data\n"\
-                    + ":--:|:--:\n"\
-                    + f"![plot of confusion matrix trainings data]({path_cm_comb_second[0].replace(path_save, '.')})|![plot of confusion matrix test data]({path_cm_comb_second[1].replace(path_save, '.')})\n\n"\
-
-        if text_entry != "":
-            text_entry = f"## Epoch {e}\n\n" + text_entry
-        with open(path_comb_md, 'a') as f:
-            f.write(text_entry)
+    # write the markdown file
+    if len(lines) > 1:
+        with open(os.path.join(path_folder, "distances.md"), "w") as f:
+            f.writelines(lines)

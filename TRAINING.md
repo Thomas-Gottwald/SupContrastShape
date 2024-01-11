@@ -82,6 +82,13 @@ Contrastive training:
 CUDA_VISIBLE_DEVICES=1 nohup python main_supcon.py --dataset animals10_diff_-1+4000 --data_folder ./datasets/animals10_diff/-1/train/ --diff_folder ./datasets/animals10_diff/4000/train/ --aug sameResizedCrop sameHorizontalFlip colorJitter grayscale --learning_rate 0.125 --temp 0.1 --cosine --model resnet18 --epochs 300 --size 300 --batch_size 26 --method SupCon --mean "(0.3816, 0.3683, 0.3052)" --std "(0.3281, 0.3198, 0.3055)" --tag colorAugSameShapeAug > supCon_colorAugSameShapeAug.out &
 ```
 
+**Resnet18, batchsize: 26, learning rate: 0.125, epochs: 300, use all same Augmentations**
+
+Contrastive training:
+```
+CUDA_VISIBLE_DEVICES=2 nohup python main_supcon.py --dataset animals10_diff_-1+4000 --data_folder ./datasets/animals10_diff/-1/train/ --diff_folder ./datasets/animals10_diff/4000/train/ --aug sameResizedCrop sameHorizontalFlip sameColorJitter sameGrayscale --learning_rate 0.125 --temp 0.1 --cosine --model resnet18 --epochs 300 --size 300 --batch_size 26 --method SupCon --mean "(0.3816, 0.3683, 0.3052)" --std "(0.3281, 0.3198, 0.3055)" --tag allSameAug > supCon_allSameAug.out &
+```
+
 ## Supervised Contrastive Learning with Factor with animals10_diff
 
 **Resnet18, batchsize: 26, learning rate: 0.125, epochs: 300, Factor 5, colorJitter, grayscale, sameResizedCrop and sameHorizontalFlip Augmentations**
@@ -105,6 +112,13 @@ CUDA_VISIBLE_DEVICES=1 nohup python main_ce.py --dataset animals10_diff_-1 --dat
 Training:
 ```
 CUDA_VISIBLE_DEVICES=1 nohup python main_ce.py --dataset animals10_diff_4000 --data_folder ./datasets/animals10_diff/4000/train/ --test_folder ./datasets/animals10_diff/4000/test/ --num_classes 10 --learning_rate 0.125 --cosine --model resnet18 --epochs 500 --size 300 --batch_size 26 --batch_size_val 26 --mean "(0.3869, 0.3732, 0.3088)" --std "(0.3273, 0.3186, 0.3039)" --tag 4000 > supCE_4000.out &
+```
+
+**Resnet18, batchsize: 26, learning rate: 0.125, epochs: 500 diffused 4000 with all augmentations**
+
+Training:
+```
+CUDA_VISIBLE_DEVICES=1 nohup python main_ce.py --dataset animals10_diff_4000 --data_folder ./datasets/animals10_diff/4000/train/ --test_folder ./datasets/animals10_diff/4000/test/ --aug resizedCrop horizontalFlip colorJitter grayscale --num_classes 10 --learning_rate 0.125 --cosine --model resnet18 --epochs 500 --size 300 --batch_size 26 --batch_size_val 26 --mean "(0.3869, 0.3732, 0.3088)" --std "(0.3273, 0.3186, 0.3039)" --tag 4000AllAug > supCE_4000AllAug.out &
 ```
 
 **Resnet18, batchsize: 26, learning rate: 0.125, epochs: 500**

@@ -16,8 +16,7 @@ from util.util import adjust_learning_rate, warmup_learning_rate, accuracy
 from util.util import set_optimizer, save_model
 from networks.resnet_big import SupCEResNet
 from util.util_diff import DiffLoader, SelectTransform
-from util.util_logging import create_run_md, create_crossentropy_plots
-from util.util_logging import add_train_to_run_md, add_class_CE_to_run_md
+from util.util_logging import create_csv_file_training, create_run_md, create_crossentropy_plots
 
 
 def parse_option():
@@ -349,7 +348,8 @@ def main():
     opt = parse_option()
 
     # create a run.md file containing the training parameters
-    create_run_md(opt, mode="SupCE")
+    create_csv_file_training(opt, os.path.join(opt.model_path, opt.model_name, "params.csv"))
+    create_run_md(os.path.join(opt.model_path, opt.model_name))
 
     # build data loader
     train_loader, val_loader = set_loader(opt)
@@ -403,8 +403,7 @@ def main():
 
     # add training and validation details to the run.md file
     create_crossentropy_plots(path=os.path.join(opt.model_path, opt.model_name))
-    add_train_to_run_md(path=os.path.join(opt.model_path, opt.model_name))
-    add_class_CE_to_run_md(path=os.path.join(opt.model_path, opt.model_name), best_acc=best_acc)
+    create_run_md(os.path.join(opt.model_path, opt.model_name))
 
 
 if __name__ == '__main__':

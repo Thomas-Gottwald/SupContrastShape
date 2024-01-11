@@ -43,7 +43,7 @@ class IdentityWrapperNet(nn.Module):
     
 
 def set_feature_loader(opt):
-    """Set tain and validation DataLoader for precomputed feature embeddings"""
+    """Set train and validation DataLoader for precomputed feature embeddings"""
     train_dataset = featureEmbeddingDataset(root=opt.data_folder)
 
     val_dataset = featureEmbeddingDataset(root=opt.test_folder)
