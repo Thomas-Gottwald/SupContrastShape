@@ -306,12 +306,12 @@ def compute_accuracies_form_cm(C):
     acc = 0.0
     for i in range(len(c_lens)):
         acc += C[i,i]
-    acc *= 100/all_len
+    acc /= all_len
     # balanced accuracy
     acc_b = 0.0
     for i, n in enumerate(c_lens):
         acc_b += C[i,i] / n
-    acc_b *= 100/len(c_lens)
+    acc_b /= len(c_lens)
 
     return acc, acc_b
 
@@ -353,9 +353,9 @@ def create_cm_md(path_folder):
                 C_train = load_confusion_matrix(cm_path_train[0])
                 acc_train, acc_b_train = compute_accuracies_form_cm(C_train)
 
-                acc_dict_train[dset].append(f"{acc_train:.2f} ({acc_b_train:.2f})")
+                acc_dict_train[dset].append(f"{acc_train*100:.2f} ({acc_b_train*100:.2f})")
                 if len(cm_plot_paths) == 2:
-                    cm_plot_dict[e].append(f"- **Training Data: Accuracy: {acc_train:.2f}, Class Balanced Accuracy: {acc_b_train:.2f}**\n")
+                    cm_plot_dict[e].append(f"- **Training Data: Accuracy: {acc_train*100:.2f}, Class Balanced Accuracy: {acc_b_train*100:.2f}**\n")
             else:
                 acc_dict_train[dset].append("")
 
@@ -364,9 +364,9 @@ def create_cm_md(path_folder):
                 C_val = load_confusion_matrix(cm_path_val[0])
                 acc_val, acc_b_val = compute_accuracies_form_cm(C_val)
 
-                acc_dict_val[dset].append(f"{acc_val:.2f} ({acc_b_val:.2f})")
+                acc_dict_val[dset].append(f"{acc_val*100:.2f} ({acc_b_val*100:.2f})")
                 if len(cm_plot_paths) == 2:
-                    cm_plot_dict[e].append(f"- **Validation Data: Accuracy: {acc_val:.2f}, Class Balanced Accuracy: {acc_b_val:.2f}**\n")
+                    cm_plot_dict[e].append(f"- **Validation Data: Accuracy: {acc_val*100:.2f}, Class Balanced Accuracy: {acc_b_val*100:.2f}**\n")
             else:
                 acc_dict_val[dset].append("")
 
