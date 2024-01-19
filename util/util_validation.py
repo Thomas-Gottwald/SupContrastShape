@@ -952,8 +952,6 @@ def compte_texture_conflict_metrics(pred_dict, classes, shape="shape_class", tex
         else:
             shape_bias_b = np.nan
 
-        bias_dict[m] = {"shape_bias": shape_bias, "acc": acc, "acc_shape": acc_shape, "acc_texture": acc_texture,
-                        "shape_bias_b": shape_bias_b, "acc_b": acc_b, "acc_b_shape": acc_b_shape, "acc_b_texture": acc_b_texture}
         bias_dict[m] = {"shape_bias": shape_bias, "shape_bias_b": shape_bias_b,
                         "acc": acc, "acc_b": acc_b,
                         "acc_shape": acc_shape, "acc_b_shape": acc_b_shape,
