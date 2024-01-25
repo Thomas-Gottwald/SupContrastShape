@@ -86,6 +86,9 @@ def parse_option():
                         help='warm-up for large batch training')
     parser.add_argument('--trial', type=str, default='0',
                         help='id for recording multiple runs')
+    
+    parser.add_argument('--ckpt', type=str, default='',
+                        help='path to pre-trained model. Continue training from this checkpoint if given.')
 
     # optional identifier tag
     parser.add_argument('--tag', type=str, default='')
@@ -103,6 +106,10 @@ def parse_option():
         and not('horizontalFlip' in opt.aug and 'sameHorizontalFlip' in opt.aug)\
         and not('colorJitter' in opt.aug and 'sameColorJitter' in opt.aug)\
         and not('grayscale' in opt.aug and 'sameGrayscale' in opt.aug)
+    
+    # check if ckpt is given that it is a valid file
+    if opt.ckpt != '':
+        assert os.path.isfile(opt.ckpt)
 
     # set the path according to the environment
     if opt.data_folder is None:
@@ -254,6 +261,18 @@ def set_model(opt):
         model = model.cuda()
         criterion = criterion.cuda()
         cudnn.benchmark = True
+
+    if os.path.isfile(opt.ckpt):
+        ckpt = torch.load(opt.ckpt, map_location='cpu')
+        state_dict = ckpt['model']
+        new_state_dict = {}
+        for k, v in state_dict.items():
+            k = k.replace("module.", "")
+            new_state_dict[k] = v
+        state_dict = new_state_dict
+
+        model.load_state_dict(state_dict)
+        print(f"checkpoint was loaded from: {opt.ckpt}")
 
     return model, criterion
 

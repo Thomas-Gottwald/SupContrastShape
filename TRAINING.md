@@ -82,11 +82,25 @@ Contrastive training:
 CUDA_VISIBLE_DEVICES=1 nohup python main_supcon.py --dataset animals10_diff_-1+4000 --data_folder ./datasets/animals10_diff/-1/train/ --diff_folder ./datasets/animals10_diff/4000/train/ --aug sameResizedCrop sameHorizontalFlip colorJitter grayscale --learning_rate 0.125 --temp 0.1 --cosine --model resnet18 --epochs 300 --size 300 --batch_size 26 --method SupCon --mean "(0.3816, 0.3683, 0.3052)" --std "(0.3281, 0.3198, 0.3055)" --tag colorAugSameShapeAug > supCon_colorAugSameShapeAug.out &
 ```
 
+**Resnet18, batchsize: 26, learning rate: 0.02, epochs: 100, fine tuning from supCon_colorAugSameShapeAug with related factor 5**
+
+Contrastive training:
+```
+CUDA_VISIBLE_DEVICES=2 nohup python main_supcon.py --dataset animals10_diff_-1+4000 --data_folder ./datasets/animals10_diff/-1/train/ --diff_folder ./datasets/animals10_diff/4000/train/ --aug sameResizedCrop sameHorizontalFlip colorJitter grayscale --learning_rate 0.02 --temp 0.1 --cosine --model resnet18 --epochs 100 --size 300 --batch_size 26 --method SupCon --related_factor 5.0 --mean "(0.3816, 0.3683, 0.3052)" --std "(0.3281, 0.3198, 0.3055)" --ckpt ./save/SupCon/animals10_diff_-1+4000/SupCon_animals10_diff_-1+4000_resnet18_lr_0.125_decay_0.0001_bsz_26_temp_0.1_trial_0_colorAugSameShapeAug_cosine/models/last.pth --save_freq 25 --tag fineTuneCAsameSAFactor5 > supCon_fineTuneCAsameSAFactor5.out &
+```
+
 **Resnet18, batchsize: 26, learning rate: 0.125, epochs: 300, use all same Augmentations**
 
 Contrastive training:
 ```
 CUDA_VISIBLE_DEVICES=2 nohup python main_supcon.py --dataset animals10_diff_-1+4000 --data_folder ./datasets/animals10_diff/-1/train/ --diff_folder ./datasets/animals10_diff/4000/train/ --aug sameResizedCrop sameHorizontalFlip sameColorJitter sameGrayscale --learning_rate 0.125 --temp 0.1 --cosine --model resnet18 --epochs 300 --size 300 --batch_size 26 --method SupCon --mean "(0.3816, 0.3683, 0.3052)" --std "(0.3281, 0.3198, 0.3055)" --tag allSameAug > supCon_allSameAug.out &
+```
+
+**Resnet18, batchsize: 26, learning rate: 0.125, epochs: 300, use all same Augmentations try 2**
+
+Contrastive training:
+```
+CUDA_VISIBLE_DEVICES=2 nohup python main_supcon.py --dataset animals10_diff_-1+4000 --data_folder ./datasets/animals10_diff/-1/train/ --diff_folder ./datasets/animals10_diff/4000/train/ --aug sameResizedCrop sameHorizontalFlip sameColorJitter sameGrayscale --learning_rate 0.125 --temp 0.1 --cosine --model resnet18 --epochs 300 --size 300 --batch_size 26 --method SupCon --mean "(0.3816, 0.3683, 0.3052)" --std "(0.3281, 0.3198, 0.3055)" --tag allSameAugTry2 > supCon_allSameAugTry2.out &
 ```
 
 ## Supervised Contrastive Learning with Factor with animals10_diff
@@ -96,6 +110,13 @@ CUDA_VISIBLE_DEVICES=2 nohup python main_supcon.py --dataset animals10_diff_-1+4
 Contrastive training:
 ```
 CUDA_VISIBLE_DEVICES=2 nohup python main_supcon.py --dataset animals10_diff_-1+4000 --data_folder ./datasets/animals10_diff/-1/train/ --diff_folder ./datasets/animals10_diff/4000/train/ --aug sameResizedCrop sameHorizontalFlip colorJitter grayscale --learning_rate 0.125 --temp 0.1 --cosine --model resnet18 --epochs 300 --size 300 --batch_size 26 --method SupCon --related_factor 5.0 --mean "(0.3816, 0.3683, 0.3052)" --std "(0.3281, 0.3198, 0.3055)" --tag factor5cAugSameSAug > supCon_factor5cAugSameSAug.out &
+```
+
+**Resnet18, batchsize: 26, learning rate: 0.125, epochs: 300, Factor 20, colorJitter, grayscale, sameResizedCrop and sameHorizontalFlip Augmentations**
+
+Contrastive training:
+```
+CUDA_VISIBLE_DEVICES=2 nohup python main_supcon.py --dataset animals10_diff_-1+4000 --data_folder ./datasets/animals10_diff/-1/train/ --diff_folder ./datasets/animals10_diff/4000/train/ --aug sameResizedCrop sameHorizontalFlip colorJitter grayscale --learning_rate 0.125 --temp 0.1 --cosine --model resnet18 --epochs 300 --size 300 --batch_size 26 --method SupCon --related_factor 20.0 --mean "(0.3816, 0.3683, 0.3052)" --std "(0.3281, 0.3198, 0.3055)" --tag factor20cAugSameSAug > supCon_factor20cAugSameSAug.out &
 ```
 
 ## Cross Entropy Learning with animals10_diff
