@@ -17,6 +17,7 @@ from tqdm import tqdm
 from PIL import Image
 from sklearn.metrics import confusion_matrix
 from torch.utils.data import Dataset
+from matplotlib.collections import PatchCollection
 
 from networks.resnet_big import SupCEResNet, SupConResNet, LinearClassifier, model_dict
 from util.util_diff import DiffLoader, DiffTransform
@@ -59,6 +60,12 @@ def get_root_dataset(dataset):
     elif dataset == "city_classification_diff":
         root_train = "./datasets/city_classification/EEDv2_5792_as_Original5/train/"
         root_test = "./datasets/city_classification/EEDv2_5792_as_Original5/val/"
+    elif dataset == "shape_texture_conflict_animals10_twe":
+        root_train = None
+        root_test = "./datasets/adaIN/shape_texture_conflict_animals10_two/"
+    elif dataset == "shape_texture_conflict_animals10_many":
+        root_train = None
+        root_test = "./datasets/adaIN/shape_texture_conflict_animals10_many/"
     else:
         root_train = None
         root_test = None
@@ -160,6 +167,99 @@ def get_path_classifier(root_model:str, dataset_classifier:str, params:dict):
         return path_classifier[0]
     else:
         return None
+    
+
+def check_exclude_with_params(params, exclude_params_dict=dict(), keep_params_dict=dict()):
+    for p in exclude_params_dict:
+        if p in params and params[p] in exclude_params_dict[p]:
+            return False
+    
+    for p in keep_params_dict:
+        if p not in params:
+            return False
+        elif p == "aug":
+            if set(keep_params_dict[p]).intersection(params[p]) != set(keep_params_dict[p]):
+                return False
+        elif params[p] != keep_params_dict[p]:
+            return False
+
+    return True
+
+
+def collect_models_dict(save_root="./save/", epoch="last", method="", dataset="", dataset_classifier="", exclude_params_dict=dict(), keep_params_dict=dict()):
+    method_folder = "*"
+    model_folder = "*"
+    if method:
+        method_folder = "SupCE" if method in ["CE", "SupCE"] else "SupCon"
+        model_folder = "SupCE_*" if method == "CE" else f"{method}_*"
+    dataset_folder = dataset if dataset else "*"
+    ckpt_file = "last.pth" if epoch=="last" else f"ckpt_epoch_{epoch}.pth"
+    model_roots = glob.glob(os.path.join(save_root, method_folder, dataset_folder, model_folder, "models", ckpt_file))
+
+    repeated_names = dict()
+    models_dict = dict()
+    for rm in model_roots:
+        path_folder, _ = get_paths_from_model_checkpoint(rm)
+        params = open_csv_file(os.path.join(path_folder, "params.csv"))
+
+        if check_exclude_with_params(params, exclude_params_dict, keep_params_dict):
+            # verify that a classifier exists for dataset_classifier
+            if dataset_classifier != "ignore":
+                if dataset_classifier != "" or "method" in params:
+                    path_classifier = get_path_classifier(rm, dataset_classifier, params)
+                    if path_classifier is None or not os.path.isfile(os.path.join(path_classifier, "models", "last.pth")):
+                        continue
+
+            # create model name consisting of the used method + dataset + augmentations
+            if len(params['aug']) == 0:
+                aug_description = "noAug"
+            elif len(params['aug']) == 1:
+                aug_description = params['aug']
+            else:
+                if set(['resizedCrop', 'horizontalFlip', 'colorJitter', 'grayscale']) == set(params['aug']):
+                    aug_description = "allAug"
+                elif set(['sameResizedCrop', 'sameHorizontalFlip', 'sameColorJitter', 'sameGrayscale']) == set(params['aug']):
+                    aug_description = "allSameAug"
+                else:
+                    aug_description = ""
+                    if "colorJitter" in params['aug'] and "grayscale" in params['aug']:
+                        aug_description += "cAug"
+                    elif "sameColorJitter" in params['aug'] and "sameGrayscale" in params['aug']:
+                        aug_description += "SameCAug"
+                    if "resizedCrop" in params['aug'] and "horizontalFlip" in params['aug']:
+                        aug_description += "sAug"
+                    elif "sameResizedCrop" in params['aug'] and "sameHorizontalFlip" in params['aug']:
+                        aug_description += "SameSAug"
+                    if aug_description == "":
+                        aug_description = "_".join(params['aug'])
+            
+            model_name = (params["method"] if "method" in params else "CE")\
+                    + (f"_{params['related_factor']}" if "related_factor" in params and params['related_factor'] != 1.0 else "")\
+                    + f"_{params['dataset']}_{aug_description}"
+            
+
+            if model_name in models_dict:
+                if model_name in repeated_names:
+                    repeated_names[model_name] += 1
+                else:
+                    repeated_names[model_name] = 1
+                model_name += f"_{repeated_names[model_name]}"
+            models_dict[model_name] = [rm, dataset_classifier]
+        
+    for mn in repeated_names:
+        for i in range(repeated_names[mn]+1):
+            m_key = mn + (f"_{i}" if i > 0 else "")
+            rm, dc = models_dict[m_key]
+            del models_dict[m_key]
+            path_folder, _ = get_paths_from_model_checkpoint(rm)
+            params = open_csv_file(os.path.join(path_folder, "params.csv"))
+
+            new_name = mn + f"_{params['tag']}" 
+            models_dict[new_name] = [rm, dc]
+
+    df_modelNames = pd.DataFrame(models_dict.keys(), columns=["model_name"]).sort_values("model_name").reset_index(drop=True)
+
+    return models_dict, df_modelNames
 
 
 # Dataloader and Model
@@ -994,8 +1094,8 @@ def plot_shape_texture_conflict_bias(class_biasses, df_bias, ax=None, balanced=F
     ax.set_yticks(ticks=np.arange(len(classes)), labels=classes)
     ax.set_xlim(-0.02, 1.02)
     ax.set_ylim(yMin, yMax)
-    ax.legend(loc='upper center', bbox_to_anchor=(0.5,1.15 + len(model_names)*0.0625))
-    ax.set_title(title, y=1.15 + len(model_names)*0.0625)
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5,1.18 + len(model_names)*0.0625))
+    ax.set_title(title, y=1.18 + len(model_names)*0.0625)
     secax = ax.secondary_xaxis("top")
     secax.set_xlabel(xlabel_2)
     secax.set_xticks(ticks=np.arange(start=0, stop=1.1, step=0.1))
@@ -1034,11 +1134,36 @@ def plot_class_recall(class_biasses, df_bias, ax=None, balanced=False):
     ax.set_xlim(0, 1.02)
     ax.set_ylim(len(df_class_acc) - 0.3, -0.7)
     ax.legend([f"{m} ({tag_acc}: {100*df_bias[m][tag_acc]:.2f}%)" for m in model_names], 
-              loc="upper center", bbox_to_anchor=(0.5,1.15 + len(class_biasses)*0.0625))
-    ax.set_title(title, y=1.15 + len(class_biasses)*0.0625)
+              loc="upper center", bbox_to_anchor=(0.5,1.18 + len(class_biasses)*0.0625))
+    ax.set_title(title, y=1.18 + len(class_biasses)*0.0625)
     secax = ax.secondary_xaxis("top")
     secax.set_xlabel(xlabel_2)
     secax.set_xticks(ticks=np.arange(start=0, stop=1.1, step=0.1))
+
+# from https://stackoverflow.com/questions/31908982/multi-color-legend-entry
+# define an object that will be used by the legend
+class MulticolorPatch(object):
+    def __init__(self, colors):
+        self.colors = colors
+
+
+# define a handler for the MulticolorPatch object
+class MulticolorPatchHandler(object):
+    def legend_artist(self, legend, orig_handle, fontsize, handlebox):
+        width, height = handlebox.width, handlebox.height
+        patches = []
+        for i, c in enumerate(orig_handle.colors):
+            patches.append(plt.Rectangle([width/len(orig_handle.colors) * i - handlebox.xdescent, 
+                                          -handlebox.ydescent],
+                           width / len(orig_handle.colors),
+                           height, 
+                           facecolor=c, 
+                           edgecolor='white'))
+
+        patch = PatchCollection(patches,match_original=True)
+
+        handlebox.add_artist(patch)
+        return patch
 
 
 def plot_class_recall_stacked(class_biasses, df_bias, ax=None, balanced=False):
@@ -1067,24 +1192,29 @@ def plot_class_recall_stacked(class_biasses, df_bias, ax=None, balanced=False):
     index = list((text_acc, *class_biasses[model_names[0]].columns))
     df_class_acc = pd.DataFrame(index=index)
     for m in class_biasses:
-        df_class_acc[f"{m}_{tag_recall_shape}"] = 0.5 * class_biasses[m].loc[tag_recall_shape]
-        df_class_acc[f"{m}_{tag_recall_texture}"] = 0.5 * class_biasses[m].loc[tag_recall_texture]
-    df_class_acc.loc[text_acc, [f"{m}_{text_recall_shape}" for m in class_biasses]] = df_bias.rename(columns=dict(zip(class_biasses,
-                                                                                                           [f"{m}_{text_recall_shape}" for m in class_biasses]))).loc[tag_acc_shape]
-    df_class_acc.loc[text_acc, [f"{m}_{text_recall_texture}" for m in class_biasses]] = df_bias.rename(columns=dict(zip(class_biasses,
-                                                                                                             [f"{m}_{text_recall_texture}" for m in class_biasses]))).loc[tag_acc_texture]
+        df_class_acc[f"_{m}_{tag_recall_shape}"] = 0.5 * class_biasses[m].loc[tag_recall_shape]
+        df_class_acc[f"_{m}_{tag_recall_texture}"] = 0.5 * class_biasses[m].loc[tag_recall_texture]
+    df_class_acc.loc[text_acc, [f"_{m}_{text_recall_shape}" for m in class_biasses]] = df_bias.rename(columns=dict(zip(class_biasses,
+                                                                                                           [f"_{m}_{text_recall_shape}" for m in class_biasses]))).loc[tag_acc_shape]
+    df_class_acc.loc[text_acc, [f"_{m}_{text_recall_texture}" for m in class_biasses]] = df_bias.rename(columns=dict(zip(class_biasses,
+                                                                                                             [f"_{m}_{text_recall_texture}" for m in class_biasses]))).loc[tag_acc_texture]
 
     cmap = plt.colormaps["tab20"]
+    legend_handles = []
+    legend_labels = []
     for i,m in enumerate(model_names):
-        df_class_acc[[f"{m}_{text_recall_shape}", f"{m}_{text_recall_texture}"]].plot.barh(stacked=True, ax=ax, position=-i+(len(model_names)/2),
+        df_class_acc[[f"_{m}_{text_recall_shape}", f"_{m}_{text_recall_texture}"]].plot.barh(stacked=True, ax=ax, position=-i+(len(model_names)/2),
                                                                        width=0.8/len(model_names), color=[cmap(2*i), cmap(2*i+1)])
+        legend_handles.append(MulticolorPatch([cmap(2*i), cmap(2*i+1)]))
+        legend_labels.append(f"shape+texture {m}")
 
     ax.set_xlabel(xlabel)
     ax.set_xticks(ticks=np.arange(start=0, stop=1.1, step=0.1))
     ax.set_xlim(0, 1.02)
     ax.set_ylim(len(df_class_acc) - 0.3, -0.7)
-    ax.legend(ncols=2, loc='upper center', bbox_to_anchor=(0.5,1.15 + len(class_biasses)*0.0625))
-    ax.set_title(title, y=1.15 + len(class_biasses)*0.0625)
     secax = ax.secondary_xaxis("top")
     secax.set_xlabel(xlabel_2)
     secax.set_xticks(ticks=np.arange(start=0, stop=1.1, step=0.1))
+    ax.set_title(title, y=1.18 + len(class_biasses)*0.0625)
+    ax.legend(handles=legend_handles, labels=legend_labels, handler_map={MulticolorPatch: MulticolorPatchHandler()},
+              loc='upper center', bbox_to_anchor=(0.5,1.18 + len(class_biasses)*0.0625))

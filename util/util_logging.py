@@ -456,28 +456,129 @@ def create_distances_md(path_folder):
     datasets_2_dist = sorted(set([dist_path.split("_dist_to_")[-1].replace(".csv", '') for dist_path in dist_paths]))
     epochs_dist = [e.replace(' ', '') for e in sorted(set([f"{dist_path.split('/')[-4].replace('val_', ''):>3}"for dist_path in dist_paths]))]
 
+    # # create one distance table for each epoch
+    # for e in epochs_dist:
+    #     dist_dict = {"Datasets": [], "Related Images": [], "Same Class": [], "All versus all": []}
+    #     for dset1 in datasets_1_dist:
+    #         for dset2 in datasets_2_dist:
+    #             dist_path = glob.glob(os.path.join(path_folder, f"val_{e}", dset1, "embeddings", f"{dset1}_dist_to_{dset2}.csv"))
+
+    #             if len(dist_path) == 1:
+    #                 df_dist = pd.read_csv(dist_path[0])
+    #                 dist_rel, dist_class, dist_all = df_dist.loc[0]
+
+    #                 dist_dict["Datasets"].append(f"{dset1} to {dset2}")
+    #                 dist_dict["Related Images"].append(f"{dist_rel:.4f} ({dist_rel/dist_all:.4f})")
+    #                 dist_dict["Same Class"].append(f"{dist_class:.4f} ({dist_class/dist_all:.4f})")
+    #                 dist_dict["All versus all"].append(f"{dist_all:.4f} ({dist_all/dist_all:.4f})")
+        
+    #     if len(dist_dict["Datasets"]) > 0:
+    #         lines.extend([f"### Epoch {e}\n\n",
+    #                     "**(in brackets are the distances divided by the All versus all distance)**\n"])
+    #         lines.extend(md_table_from_dict(dist_dict))
+
     # create one distance table for each epoch
     for e in epochs_dist:
-        dist_dict = {"Datasets": [], "Related Images": [], "Same Class": [], "All versus all": []}
+        dist_dict = {"Datasets": [], "Mean Related": [], "Std Related": [], "Mean in Class": [], "Std in Class": [],
+                     "Mean All vs. all": [], "Std All vs. all": []}
+        lines_plots = []
         for dset1 in datasets_1_dist:
             for dset2 in datasets_2_dist:
                 dist_path = glob.glob(os.path.join(path_folder, f"val_{e}", dset1, "embeddings", f"{dset1}_dist_to_{dset2}.csv"))
 
                 if len(dist_path) == 1:
-                    df_dist = pd.read_csv(dist_path[0])
-                    dist_rel, dist_class, dist_all = df_dist.loc[0]
+                    df_dist = pd.read_csv(dist_path[0], index_col=0)
+                    mean_rel, mean_class, mean_all = df_dist.T.loc[:,["mean_distance_related", "mean_distance_classes", "mean_distance_all_vs_all"]].iloc[0]
+                    std_rel, std_class, std_all = df_dist.T.loc[:,["std_distance_related", "std_distance_classes", "std_distance_all_vs_all"]].iloc[0]
 
                     dist_dict["Datasets"].append(f"{dset1} to {dset2}")
-                    dist_dict["Related Images"].append(f"{dist_rel:.4f} ({dist_rel/dist_all:.4f})")
-                    dist_dict["Same Class"].append(f"{dist_class:.4f} ({dist_class/dist_all:.4f})")
-                    dist_dict["All versus all"].append(f"{dist_all:.4f} ({dist_all/dist_all:.4f})")
+                    dist_dict["Mean Related"].append(f"{mean_rel:.4f} ({mean_rel/mean_all:.4f})")
+                    dist_dict["Std Related"].append(f"{std_rel:.4f}")
+                    dist_dict["Mean in Class"].append(f"{mean_class:.4f} ({mean_class/mean_all:.4f})")
+                    dist_dict["Std in Class"].append(f"{std_class:.4f}")
+                    dist_dict["Mean All vs. all"].append(f"{mean_all:.4f} ({mean_all/mean_all:.4f})")
+                    dist_dict["Std All vs. all"].append(f"{std_all:.4f}")
+
+                dist_plot_path = glob.glob(os.path.join(path_folder, f"val_{e}", dset1, "embeddings", f"distance_hist_between_{dset1}_and_{dset2}.png"))
+                if len(dist_plot_path) == 1:
+                    lines_plots.extend([f"**Histogram of cosine distances between {dset1} and {dset2}**\n",
+                                        f"![histogram of distances]({os.path.join('.', f'val_{e}', dset1, 'embeddings', f'distance_hist_between_{dset1}_and_{dset2}.png')})\n\n"])
         
         if len(dist_dict["Datasets"]) > 0:
             lines.extend([f"### Epoch {e}\n\n",
-                        "**(in brackets are the distances divided by the All versus all distance)**\n"])
+                        "**(in brackets are the mean distances divided by the mean All versus all distance)**\n"])
             lines.extend(md_table_from_dict(dist_dict))
+
+            if len(lines_plots) > 0:
+                lines.append("#### Distance Histograms Plots\n\n")
+                lines.extend(lines_plots)
 
     # write the markdown file
     if len(lines) > 1:
         with open(os.path.join(path_folder, "distances.md"), "w") as f:
+            f.writelines(lines)
+
+def create_shape_bias_md(path_folder):
+    params_csv = open_csv_file(os.path.join(path_folder, "params.csv"))
+
+    # set the title
+    if "method" in params_csv:
+        title = f"Shape Bias Metrics: {params_csv['method']}"
+    else:
+        title = "Shape Bias Metrics: CE"
+    title += f" {params_csv['dataset']} {params_csv['tag']}"
+
+    lines = [f"# {title}\n\n"]
+
+    # Cue Conflict Shape Bias Metric
+    # collect epochs and datasets
+    cue_conf_paths = glob.glob(os.path.join(path_folder, "val_*", "shapeBiasMetrics", "CueConflict", "*", "shape_bias.csv"))
+    cue_conf_datasets = sorted(set([cue_conf_path.split('/')[-2] for cue_conf_path in cue_conf_paths]))
+    epochs_cue_conf = [e.replace(' ', '') for e in sorted(set([f"{cue_conf_path.split('/')[-5].replace('val_', ''):>3}" for cue_conf_path in cue_conf_paths]))]
+    if len(cue_conf_paths) > 0:
+        lines.append("## Texture Shape Cue Conflict Shape Bias Metric\n\n")
+
+    # create for each epoch one table with shape biases for all datasets
+    for e in epochs_cue_conf:
+        list_df_bias = []
+
+        # for each data set create one table with class shape biasses (and plots if they where found)
+        lines_datasets = dict()
+        for dset in cue_conf_datasets:
+            sb_paths = glob.glob(os.path.join(path_folder, f"val_{e}", "shapeBiasMetrics", "CueConflict", dset, "shape_bias.csv"))
+
+            if len(sb_paths) == 1:
+                df_bias = pd.read_csv(sb_paths[0], index_col=0)
+                list_df_bias.append(df_bias)
+
+                lines_datasets[dset] = []
+                class_sb_paths = glob.glob(os.path.join(path_folder, f"val_{e}", "shapeBiasMetrics", "CueConflict", dset, "classes_shape_bias.csv"))
+                if len(class_sb_paths) == 1:
+                    df_class_bias = pd.read_csv(class_sb_paths[0], index_col=0).reset_index(names="metrics")
+                    lines_datasets[dset].append(f"#### Dataset {dset}\n\n")
+                    lines_datasets[dset].extend(md_table_from_dict(df_class_bias))
+
+                    bias_plot_paths = glob.glob(os.path.join(path_folder, f"val_{e}", "shapeBiasMetrics", "CueConflict", dset, "shape_bias.png"))
+                    recall_plot_paths = glob.glob(os.path.join(path_folder, f"val_{e}", "shapeBiasMetrics", "CueConflict", dset, "classes_recall.png"))
+                    if len(bias_plot_paths) == 1 and len(recall_plot_paths) == 1:
+                        lines_datasets[dset].extend([f"Shape Bias | Class Recall\n",
+                                                     ":--:|:--:\n",
+                                                     f"![plot of the class shape biasses]({os.path.join('.', f'val_{e}', 'shapeBiasMetrics', 'CueConflict', dset, 'shape_bias.png')})",
+                                                     f"|![plot of the class recalls]({os.path.join('.', f'val_{e}', 'shapeBiasMetrics', 'CueConflict', dset, 'classes_recall.png')})\n\n"])
+                        
+        if len(list_df_bias) > 0:
+            lines.append(f"### Epoch {e}\n\n")
+            df_biases = pd.concat(list_df_bias, axis=1).reset_index(names="metrics")
+            lines.extend(md_table_from_dict(df_biases))
+
+            for dset in cue_conf_datasets:
+                if len(lines_datasets[dset]) > 0:
+                    lines.extend(lines_datasets[dset])
+
+    # Estimated Feature Dimensions Shape Bias Metric
+
+
+    # write the markdown file
+    if len(lines) > 1:
+        with open(os.path.join(path_folder, "shape_bias.md"), "w") as f:
             f.writelines(lines)
