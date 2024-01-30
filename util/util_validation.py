@@ -66,6 +66,9 @@ def get_root_dataset(dataset):
     elif dataset == "shape_texture_conflict_animals10_many":
         root_train = None
         root_test = "./datasets/adaIN/shape_texture_conflict_animals10_many/"
+    elif dataset == "stylized_animals10":
+        root_train = None
+        root_test = "./datasets/adaIN/stylized_animals10/test/"
     else:
         root_train = None
         root_test = None
@@ -444,19 +447,21 @@ def compute_and_save_embeddings(model, train_loader, val_loader, path_embeddings
 
     # Trainings Data
     embedding_train, class_labels_train = compute_embedding(model, train_loader, params, cuda_device)
+    images_train = [img[0].replace(train_loader.dataset.root, '') for img in train_loader.dataset.imgs]
 
-    entry = {'data': embedding_train, 'labels': class_labels_train}
+    entry = {'data': embedding_train, 'labels': class_labels_train, 'images': images_train}
     with open(os.path.join(path_embeddings, "embedding_train"), 'wb') as f:
         pickle.dump(entry, f, protocol=-1)
 
     # Test Data
     embedding_test, class_labels_test = compute_embedding(model, val_loader, params, cuda_device)
+    images_test = [img[0].replace(val_loader.dataset.root, '') for img in val_loader.dataset.imgs]
 
-    entry = {'data': embedding_test, 'labels': class_labels_test}
+    entry = {'data': embedding_test, 'labels': class_labels_test, 'images': images_test}
     with open(os.path.join(path_embeddings, "embedding_test"), 'wb') as f:
         pickle.dump(entry, f, protocol=-1)
 
-    return embedding_train, class_labels_train, embedding_test, class_labels_test
+    return embedding_train, class_labels_train, images_train, embedding_test, class_labels_test, images_test
 
 
 # t-SNE

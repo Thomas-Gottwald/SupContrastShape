@@ -11,19 +11,22 @@ from torchvision import transforms, datasets
 import util.util_validation as ut_val
 from tqdm import tqdm
 
+from networks.resnet_big import model_dict
 from util.util_logging import open_csv_file
-from util.util_diff import DiffLoader, DiffTransform
-from util.util_diff import SameTwoColorJitter, SameTwoApply
+from util.util import TwoCropTransform
+from util.util_diff import SameTwoApply
 
 
 # Cue Conflict Shape Bias
-def evaluate_cue_conflict_dataset(root_model, dataset_classifier, root_dataset_conflict, cuda_device, exclude_original_dict=dict()):
+def evaluate_cue_conflict_dataset(root_model, dataset_classifier, dataset_cue_conflict, cuda_device, exclude_original_dict=dict()):
     path_folder, _ = ut_val.get_paths_from_model_checkpoint(root_model)
     params = open_csv_file(os.path.join(path_folder, "params.csv"))
     if dataset_classifier is None:
         path_classifier = ut_val.get_path_classifier(root_model, "", params)
     else:
         path_classifier = ut_val.get_path_classifier(root_model, dataset_classifier, params)
+
+    _, root_dataset_conflict = ut_val.get_root_dataset(dataset_cue_conflict)
 
     normalize = transforms.Normalize(mean=params["mean"], std=params["std"])
     val_transform = transforms.Compose([transforms.Resize(params["size"]), transforms.CenterCrop(params["size"]), transforms.ToTensor(), normalize])
@@ -46,14 +49,14 @@ def evaluate_cue_conflict_dataset(root_model, dataset_classifier, root_dataset_c
     return df_pred, classes
 
 
-def evaluate_cue_conflict_dataset_for_many(models_dict, root_dataset_conflict, cuda_device, exclude_original_dict=dict()):
+def evaluate_cue_conflict_dataset_for_many(models_dict, dataset_cue_conflict, cuda_device, exclude_original_dict=dict()):
     print("Get predictions for shape texture cue conflict dataset")
     pred_dict = dict()
 
     for m in models_dict:
         root_model, dataset_classifier = models_dict[m]
 
-        df_pred, classes = evaluate_cue_conflict_dataset(root_model, dataset_classifier, root_dataset_conflict, cuda_device, exclude_original_dict)
+        df_pred, classes = evaluate_cue_conflict_dataset(root_model, dataset_classifier, dataset_cue_conflict, cuda_device, exclude_original_dict)
         pred_dict[m] = df_pred
 
     return pred_dict, classes
@@ -129,15 +132,15 @@ def compute_cue_conflict_shape_bias_metric_for_many(pred_dict, classes, shape="s
     return df_biases, class_biasses
 
 
-def cue_conflict_shape_bias_metric(root_model, dataset_classifier, model_short_name, root_dataset_conflict, cuda_device):
-    df_pred, classes = evaluate_cue_conflict_dataset(root_model, dataset_classifier, root_dataset_conflict, cuda_device)
+def cue_conflict_shape_bias_metric(root_model, dataset_classifier, model_short_name, dataset_cue_conflict, cuda_device):
+    df_pred, classes = evaluate_cue_conflict_dataset(root_model, dataset_classifier, dataset_cue_conflict, cuda_device)
     df_bias, df_class_bias = compute_cue_conflict_shape_bias_metric(df_pred, classes, model_short_name)
 
     return df_bias, df_class_bias
 
 
-def cue_conflict_shape_bias_metric_for_many(models_dict, root_dataset_conflict, cuda_device):
-    pred_dict, classes = evaluate_cue_conflict_dataset_for_many(models_dict, root_dataset_conflict, cuda_device)
+def cue_conflict_shape_bias_metric_for_many(models_dict, dataset_cue_conflict, cuda_device):
+    pred_dict, classes = evaluate_cue_conflict_dataset_for_many(models_dict, dataset_cue_conflict, cuda_device)
     df_biases, class_biasses = compute_cue_conflict_shape_bias_metric_for_many(pred_dict, classes)
 
     return df_biases, class_biasses
@@ -228,106 +231,164 @@ class TwoDifferentApply:
             x_diff = self.transform_diff(x_diff)
 
         return [x_orig, x_diff]
-    
 
-def compute_load_orig_shape_texture_embeddings(root_model, dataset_orig, dataset_shape, cuda_device, use_colorJitter=False, patch_size=30):
+
+def compute_load_orig_shape_texture_embeddings(root_model, dataset_orig, dataset_shape, cuda_device, separate_color=False, apply_ColorJitter=[], patch_size=30):
     path_folder, path_embeddings_orig, path_embeddings_diff, _ = ut_val.get_paths_from_model_checkpoint(root_model, dataset_1=dataset_orig, dataset_2=dataset_shape)
     params = open_csv_file(os.path.join(path_folder, "params.csv"))
 
     _, root_dataset_orig = ut_val.get_root_dataset(dataset=dataset_orig)
-
-    # compute patch shuffled embeddings of the original dataset to keep texture information but remove shape information
     normalize = transforms.Normalize(mean=params['mean'], std=params['std'])
-    shufflePatchers_transform_list = []
-    if use_colorJitter:
-        shufflePatchers_transform_list.append(transforms.ColorJitter(0.4, 0.4, 0.4, 0.4))
-    shufflePatchers_transform_list.extend([transforms.ToTensor(), ShufflePatches(patch_size=patch_size), normalize])
-    shufflePatchers_transform = transforms.Compose(shufflePatchers_transform_list)
 
-    shufflePatches_dataset = datasets.ImageFolder(root=root_dataset_orig,transform=shufflePatchers_transform)
-    shufflePatches_dataloader = torch.utils.data.DataLoader(shufflePatches_dataset, batch_size=params['batch_size'],
-                                                            shuffle=False, num_workers=16, pin_memory=True)
+    # load the pre computed original embeddings
+    with open(os.path.join(path_embeddings_orig, "embedding_test"), 'rb') as f:
+        entry = pickle.load(f, encoding='latin1')
+        embedding_orig = entry['data']
+        class_labels = entry['labels']
 
+        # load the image names (or compute and store them for the future)
+        if "images" in entry:
+            images_orig = entry["images"]
+        else:
+            print(f"{dataset_orig}: Image names not found in precomputed embeddings! Recompute them and store them wich image names!")
+            root_dataset_orig_train, root_dataset_orig = ut_val.get_root_dataset(dataset=dataset_orig)
+
+            train_loader, val_loader = ut_val.set_dataloader(dataset_orig, params, root_dataset_orig_train, root_dataset_orig)
+            model = ut_val.set_model(root_model, params, cuda_device)
+
+            _, _, _, embedding_orig, class_labels, images_orig = ut_val.compute_and_save_embeddings(model, train_loader, val_loader, path_embeddings_orig, params, cuda_device)
+        # use image names to sort the feature embeddings and class labels so that they match up with the other embeddings
+        embedding_orig = embedding_orig[np.argsort(images_orig)]
+        class_labels = class_labels[np.argsort(images_orig)]
+
+    if "shape" in apply_ColorJitter or not os.path.isfile(os.path.join(path_embeddings_diff, "embedding_test")):
+        # if no precomputed embeddings exist or color jitter should be applied to the shape data then compute the embeddings
+        _, root_dataset_shape = ut_val.get_root_dataset(dataset=dataset_shape)
+
+        if "shape" in apply_ColorJitter:
+            shape_transform = transforms.Compose([transforms.ColorJitter(0.4, 0.4, 0.4, 0.4), transforms.ToTensor(), normalize])
+        else:
+            shape_transform = transforms.Compose([transforms.ToTensor(), normalize])
+
+        shape_dataset = datasets.ImageFolder(root=root_dataset_shape, transform=shape_transform)
+        shape_dataloader = torch.utils.data.DataLoader(shape_dataset, batch_size=params['batch_size'],
+                                                        shuffle=False, num_workers=params["num_workers"], pin_memory=True)
+
+        model = ut_val.set_model(root_model, params, cuda_device)
+
+        embedding_shape, _ = ut_val.compute_embedding(model, shape_dataloader, params, cuda_device)
+        images_shape = [img[0].replace(shape_dataset.root, '') for img in shape_dataset.imgs]
+        # use image names to sort the feature embeddings so that they match up with the other embeddings
+        embedding_shape = embedding_shape[np.argsort(images_shape)]
+    else:
+        # load pre computed embeddings of the shape dataset if they exit
+        with open(os.path.join(path_embeddings_diff, "embedding_test"), 'rb') as f:
+            entry = pickle.load(f, encoding='latin1')
+            embedding_shape = entry['data']
+
+        # load the image names (or compute and store them for the future)
+        if "images" in entry:
+            images_shape = entry["images"]
+        else:
+            print(f"{dataset_shape}: Image names not found in precomputed embeddings! Recompute them and store them wich image names!")
+            root_dataset_shape_train, root_dataset_shape = ut_val.get_root_dataset(dataset=dataset_shape)
+
+            train_loader, val_loader = ut_val.set_dataloader(dataset_shape, params, root_dataset_shape_train, root_dataset_shape)
+            model = ut_val.set_model(root_model, params, cuda_device)
+
+            _, _, _, embedding_shape, _, images_shape = ut_val.compute_and_save_embeddings(model, train_loader, val_loader, path_embeddings_diff, params, cuda_device)
+        # use image names to sort the feature embeddings so that they match up with the other embeddings
+        embedding_shape = embedding_shape[np.argsort(images_shape)]
+
+    if separate_color:
+        # if the color should be considered as a component independent of texture than compute the "color embedding" from pixel wise shuffled original images
+        # at the same time compute the "texture embeddings" (apply color jitter if given)
+        if "texture" in apply_ColorJitter:
+            patchShuffle_transform = transforms.Compose([TwoDifferentApply(transform_orig=transforms.ColorJitter(0.4, 0.4, 0.4, 0.4)),
+                                                         SameTwoApply(transforms.ToTensor()),
+                                                         TwoDifferentApply(transform_orig=ShufflePatches(patch_size=patch_size), transform_diff=ShufflePatches(patch_size=1))])
+        else:
+            patchShuffle_transform = transforms.Compose([SameTwoApply(transforms.ToTensor()),
+                                                         TwoDifferentApply(transform_orig=ShufflePatches(patch_size=patch_size), transform_diff=ShufflePatches(patch_size=1))])
+        textureColor_dataset = datasets.ImageFolder(root=root_dataset_orig,
+                                                    transform=TwoCropTransform(normalize, patchShuffle_transform))
+        textureColor_dataloader = torch.utils.data.DataLoader(textureColor_dataset, batch_size=params['batch_size'],
+                                                              shuffle=False, num_workers=params["num_workers"], pin_memory=True)
+        
+        model = ut_val.set_model(root_model, params, cuda_device)
+
+        embedding_texture, embedding_color, _ = ut_val.compute_diff_embeddings(model, textureColor_dataloader, params, cuda_device)
+        # use image names to sort the feature embeddings so that they match up with the other embeddings
+        images_textureColor_argsort = np.argsort([img[0].replace(textureColor_dataset.root, '') for img in textureColor_dataset.imgs])
+        embedding_texture = embedding_texture[images_textureColor_argsort]
+        embedding_color = embedding_color [images_textureColor_argsort]
+
+
+        return embedding_orig, embedding_shape, embedding_texture, embedding_color, class_labels
+    else:
+        # compute the "texture embedding" as patches shuffled images with given patch_size from the original images (apply color jitter if given)
+        if "texture" in apply_ColorJitter:
+            texture_transform = transforms.Compose([transforms.ToTensor(), ShufflePatches(patch_size=patch_size), normalize])
+        else:
+            texture_transform = transforms.Compose([transforms.ToTensor(), ShufflePatches(patch_size=patch_size), normalize])
+
+        texture_dataset = datasets.ImageFolder(root=root_dataset_orig, transform=texture_transform)
+        texture_dataloader = torch.utils.data.DataLoader(texture_dataset, batch_size=params['batch_size'],
+                                                                shuffle=False, num_workers=params["num_workers"], pin_memory=True)
+
+        model = ut_val.set_model(root_model, params, cuda_device)
+
+        embedding_texture, _ = ut_val.compute_embedding(model, texture_dataloader, params, cuda_device)
+        images_texture = [img[0].replace(texture_dataset.root, '') for img in texture_dataset.imgs]
+        embedding_texture = embedding_texture[np.argsort(images_texture)]
+
+
+        return embedding_orig, embedding_shape, embedding_texture, class_labels
+
+
+def compute_cue_conflict_embeddings(root_model, dataset_cue_conflict, cuda_device):
+    path_folder, _ = ut_val.get_paths_from_model_checkpoint(root_model)
+    params = open_csv_file(os.path.join(path_folder, "params.csv"))
+
+    _, root_dataset_conflict = ut_val.get_root_dataset(dataset_cue_conflict)
+
+    # dataloader and model
+    normalize = transforms.Normalize(mean=params['mean'], std=params['std'])
+    val_transform = transforms.Compose([transforms.ToTensor(), normalize])
+
+    conflict_dataset = ut_val.shapeTextureConflictDataset(root_dataset_conflict, val_transform)
+
+    classes = conflict_dataset.classes
+    shape_texture_name_list = [path.replace(".jpg", '').split('/')[-3:] for path in conflict_dataset.paths]
+    # list of shape and texture image names in the form ("shapeClassLabel/shapeImageName", "textureClassLabel/textureImageName")
+    shapeName_textureName_list = [(s+'/'+n.split('_stylized_')[0], t+'/'+n.split('_stylized_')[1]) for s,t,n in shape_texture_name_list]
+
+    conflict_dataloader = torch.utils.data.DataLoader(conflict_dataset, batch_size=params['batch_size'],
+                                                      shuffle=False, num_workers=16, pin_memory=True)
+    
     model = ut_val.set_model(root_model, params, cuda_device)
 
-    embedding_texture, _ = ut_val.compute_embedding(model, shufflePatches_dataloader, params, cuda_device)
+    # compute embeddings
+    _, embedding_size = model_dict[params['model']]
 
-    # load the pre computed original embeddings
-    with open(os.path.join(path_embeddings_orig, "embedding_test"), 'rb') as f:
-        entry = pickle.load(f, encoding='latin1')
-        embedding_orig = entry['data']
-        class_labels = entry['labels']
+    model.eval()
 
-    if use_colorJitter:
-        # compute the color jittered embeddings of the shape dataset
-        _, root_dataset_shape = ut_val.get_root_dataset(dataset=dataset_shape)
+    embedding = np.array([])
+    shape_labels = np.array([], dtype=int)
+    texture_labels = np.array([], dtype=int)
+    with torch.no_grad():
+        for images, labels in tqdm(conflict_dataloader):
+            images = images.cuda(device=cuda_device, non_blocking=True)
 
-        shape_transform = transforms.Compose([transforms.ColorJitter(0.4, 0.4, 0.4, 0.4),
-                                              transforms.ToTensor(), normalize])
-        
-        shape_dataset = datasets.ImageFolder(root=root_dataset_shape,transform=shape_transform)
-        shape_dataloader = torch.utils.data.DataLoader(shape_dataset, batch_size=params['batch_size'],
-                                                       shuffle=False, num_workers=16, pin_memory=True)
-        
-        embedding_shape, _ = ut_val.compute_embedding(model, shape_dataloader, params, cuda_device)
-    else:
-        # load pre computed embeddings of the shape dataset
-        with open(os.path.join(path_embeddings_diff, "embedding_test"), 'rb') as f:
-            entry = pickle.load(f, encoding='latin1')
-            embedding_shape = entry['data']
+            features = model.encoder(images)
 
-    return embedding_orig, embedding_shape, embedding_texture, class_labels
+            embedding = np.append(embedding, features.cpu().numpy())
+            shape_labels = np.append(shape_labels, labels[0].numpy())
+            texture_labels = np.append(texture_labels, labels[1].numpy())
 
+    embedding = embedding.reshape(-1, embedding_size)
 
-def compute_load_orig_shape_texture_embeddings(root_model, dataset_orig, dataset_shape, cuda_device, use_colorJitter=False, patch_size=30):
-    path_folder, path_embeddings_orig, path_embeddings_diff, _ = ut_val.get_paths_from_model_checkpoint(root_model, dataset_1=dataset_orig, dataset_2=dataset_shape)
-    params = open_csv_file(os.path.join(path_folder, "params.csv"))
-
-    _, root_dataset_orig = ut_val.get_root_dataset(dataset=dataset_orig)
-
-    # load the pre computed original embeddings
-    with open(os.path.join(path_embeddings_orig, "embedding_test"), 'rb') as f:
-        entry = pickle.load(f, encoding='latin1')
-        embedding_orig = entry['data']
-        class_labels = entry['labels']
-
-    if use_colorJitter:
-        # compute the embeddings of the shape dataset and the patch shuffled original dataset with the same color jitter applied to both
-        _, root_dataset_shape = ut_val.get_root_dataset(dataset=dataset_shape)
-
-        normalize = transforms.Normalize(mean=params['mean'], std=params['std'])
-        colorJitterOrigPatchShuffle_transform = transforms.Compose([SameTwoColorJitter(0.4, 0.4, 0.4, 0.4), SameTwoApply(transforms.ToTensor()),
-                                                                   TwoDifferentApply(transform_orig=ShufflePatches(patch_size=patch_size))])
-        
-        textureShape_dataset = datasets.ImageFolder(root=root_dataset_orig,
-                                                    loader=DiffLoader(path_orig=root_dataset_orig, path_diff=root_dataset_shape),
-                                                    transform=DiffTransform(normalize, colorJitterOrigPatchShuffle_transform))
-        textureShape_dataloader = torch.utils.data.DataLoader(textureShape_dataset, batch_size=params['batch_size'],
-                                                                shuffle=False, num_workers=params["num_workers"], pin_memory=True)
-        
-        model = ut_val.set_model(root_model, params, cuda_device)
-
-        embedding_texture, embedding_shape, _ = ut_val.compute_diff_embeddings(model, textureShape_dataloader, params, cuda_device)
-        
-    else:
-        # load pre computed embeddings of the shape dataset
-        with open(os.path.join(path_embeddings_diff, "embedding_test"), 'rb') as f:
-            entry = pickle.load(f, encoding='latin1')
-            embedding_shape = entry['data']
-
-        # compute patch shuffled embeddings of the original dataset to keep texture information but remove shape information
-        normalize = transforms.Normalize(mean=params['mean'], std=params['std'])
-        shufflePatchers_transform = transforms.Compose([transforms.ToTensor(), ShufflePatches(patch_size=patch_size), normalize])
-
-        shufflePatches_dataset = datasets.ImageFolder(root=root_dataset_orig,transform=shufflePatchers_transform)
-        shufflePatches_dataloader = torch.utils.data.DataLoader(shufflePatches_dataset, batch_size=params['batch_size'],
-                                                                shuffle=False, num_workers=params["num_workers"], pin_memory=True)
-
-        model = ut_val.set_model(root_model, params, cuda_device)
-
-        embedding_texture, _ = ut_val.compute_embedding(model, shufflePatches_dataloader, params, cuda_device)
-
-    return embedding_orig, embedding_shape, embedding_texture, class_labels
+    return embedding, shape_labels, texture_labels, classes, shapeName_textureName_list
 
 
 def compute_dim_correlation_coefficients(embedding_A, embedding_B):
@@ -337,7 +398,10 @@ def compute_dim_correlation_coefficients(embedding_A, embedding_B):
     A_dm = A - A.mean(dim=0)
     B_dm = B - B.mean(dim=0)
 
-    correlation = (A_dm * B_dm).sum(dim=0) / ((A_dm * A_dm).sum(dim=0) * (B_dm * B_dm).sum(dim=0)).sqrt()
+    correlation = ((A_dm * B_dm).sum(dim=0) / ((A_dm * A_dm).sum(dim=0) * (B_dm * B_dm).sum(dim=0)).sqrt())
+
+    # if there is a neuron that has no variation in its output the computed correlation coefficient will be NaN
+    # set these NaN values to zero because a constant value can be seen to be uncorrelated to any random variable
     correlation = torch.nan_to_num(correlation, nan=0.0)
 
     return correlation.numpy()
@@ -359,11 +423,11 @@ def estimate_dims(correlation):
     return dims
 
 
-def compute_corelation_coefficient_shape_bias_metric(embedding_orig, embedding_shape, embedding_texture, model_short_name, use_colorJitter=False):
-    corr_coef_shape = compute_dim_correlation_coefficients(embedding_orig, embedding_shape)
-    corr_coef_texture = compute_dim_correlation_coefficients(embedding_orig, embedding_texture)
-    if use_colorJitter:
-        corr_coef_color = compute_dim_correlation_coefficients(embedding_shape, embedding_texture)
+def compute_corelation_coefficient_shape_bias_metric(shape_pair, texture_pair, model_short_name, color_pair=None):
+    corr_coef_shape = compute_dim_correlation_coefficients(shape_pair[0], shape_pair[1])
+    corr_coef_texture = compute_dim_correlation_coefficients(texture_pair[0], texture_pair[1])
+    if color_pair is not None:
+        corr_coef_color = compute_dim_correlation_coefficients(color_pair[0], color_pair[1])
 
         dims = estimate_dims([corr_coef_shape, corr_coef_texture, corr_coef_color])
 
@@ -376,25 +440,102 @@ def compute_corelation_coefficient_shape_bias_metric(embedding_orig, embedding_s
     return df_dims
 
 
-def corelation_coefficient_shape_bias_metric(root_model, model_short_name, dataset_orig, dataset_shape, cuda_device, use_colorJitter=False, patch_size=30):
-    embedding_orig, embedding_shape, embedding_texture, _ = compute_load_orig_shape_texture_embeddings(root_model, dataset_orig, dataset_shape, cuda_device, use_colorJitter, patch_size)
+def corelation_coefficient_shape_bias_metric(root_model, model_short_name, dataset_orig, dataset_shape, cuda_device, separate_color=False, apply_ColorJitter=[], patch_size=30):
+    if separate_color:
+        embedding_orig, embedding_shape, embedding_texture, embedding_color, _ = compute_load_orig_shape_texture_embeddings(root_model, dataset_orig, dataset_shape, cuda_device, separate_color, apply_ColorJitter, patch_size)
 
-    df_dims = compute_corelation_coefficient_shape_bias_metric(embedding_orig, embedding_shape, embedding_texture, model_short_name, use_colorJitter)
+        df_dims = compute_corelation_coefficient_shape_bias_metric(shape_pair=(embedding_orig,embedding_shape), texture_pair=(embedding_orig,embedding_texture),
+                                                                   color_pair=(embedding_orig,embedding_color), model_short_name=model_short_name)
+    else:
+        embedding_orig, embedding_shape, embedding_texture, _ = compute_load_orig_shape_texture_embeddings(root_model, dataset_orig, dataset_shape, cuda_device, separate_color, apply_ColorJitter, patch_size)
+
+        df_dims = compute_corelation_coefficient_shape_bias_metric(shape_pair=(embedding_orig,embedding_shape), texture_pair=(embedding_orig,embedding_texture),
+                                                                   model_short_name=model_short_name)
 
     return df_dims
 
 
-def corelation_coefficient_shape_bias_metric_for_many(models_dict, dataset_orig, dataset_shape, cuda_device, use_colorJitter=False, patch_size=30):
+def corelation_coefficient_shape_bias_metric_for_many(models_dict, dataset_orig, dataset_shape, cuda_device, separate_color=False, apply_ColorJitter=[], patch_size=30):
     dims_list = []
     for m in models_dict:
         root_model, _ = models_dict[m]
 
-        embedding_orig, embedding_shape, embedding_texture, _ = compute_load_orig_shape_texture_embeddings(root_model, dataset_orig, dataset_shape, cuda_device, use_colorJitter, patch_size)
-
-        df_dims = compute_corelation_coefficient_shape_bias_metric(embedding_orig, embedding_shape, embedding_texture, m, use_colorJitter)
+        df_dims = corelation_coefficient_shape_bias_metric(root_model, m, dataset_orig, dataset_shape, cuda_device, separate_color, apply_ColorJitter, patch_size)
         dims_list.append(df_dims)
 
     return pd.concat(dims_list, axis=0)
+
+
+def corelation_coefficient_shape_bias_metric_from_cue_conflict_dataset(root_model, model_short_name, dataset_cue_conflict, cuda_device):
+    embedding, _, _, _, shapeName_textureName_list = compute_cue_conflict_embeddings(root_model, dataset_cue_conflict, cuda_device)
+
+    # determent the shape and texture pairs in the cue conflict embedding
+    shape_pairs = []
+    shape_array = np.array([sN for sN,_ in shapeName_textureName_list])
+    for sN in set(shape_array):
+        shape_indices = np.where(shape_array == sN)[0]
+        shape_pairs.append(shape_indices)
+
+    shape_pair_A = np.concatenate([np.tile(shape_pairs[i], reps=len(shape_pairs[i])-1) for i in range(len(shape_pairs))])
+    shape_pair_B = np.concatenate([np.concatenate([np.roll(shape_pairs[i], shift=j) for j in range(1,len(shape_pairs[i]))]) for i in range(len(shape_pairs))])
+
+    texture_pairs = []
+    texture_array = np.array([tN for _,tN in shapeName_textureName_list])
+    for tN in set(texture_array):
+        texture_indices = np.where(texture_array == tN)[0]
+        texture_pairs.append(texture_indices)
+
+    texture_pair_A = np.concatenate([np.tile(texture_pairs[i], reps=len(texture_pairs[i])-1) for i in range(len(texture_pairs))])
+    texture_pair_B = np.concatenate([np.concatenate([np.roll(texture_pairs[i], shift=j) for j in range(1,len(texture_pairs[i]))]) for i in range(len(texture_pairs))])
+
+    # estimate the shape and texture dimensions
+    df_dims = compute_corelation_coefficient_shape_bias_metric(shape_pair=(embedding[shape_pair_A],embedding[shape_pair_B]), texture_pair=(embedding[texture_pair_A],embedding[texture_pair_B]),
+                                                               model_short_name=model_short_name)
+    
+    return df_dims
+
+
+def corelation_coefficient_shape_bias_metric_from_cue_conflict_dataset_for_many(models_dict, dataset_cue_conflict, cuda_device):
+    dims_list = []
+    for m in models_dict:
+        root_model, _ = models_dict[m]
+
+        df_dims = corelation_coefficient_shape_bias_metric_from_cue_conflict_dataset(root_model, m, dataset_cue_conflict, cuda_device)
+        dims_list.append(df_dims)
+
+    return pd.concat(dims_list, axis=0)
+
+
+def save_correlation_coefficient_shape_bias_to_csv_file(root_model, df_dims, dataset_dict, apply_ColorJitter=[], patch_size=30):
+    path_folder, epoch = ut_val.get_paths_from_model_checkpoint(root_model)
+
+    # determent the datasets used
+    if "cue_conflict" in dataset_dict:
+        assert len(dataset_dict) == 1
+        datasets_corr_coef = dataset_dict["cue_conflict"]
+    else:
+        assert "shape" in dataset_dict and "texture" in dataset_dict
+        dataset_shape = dataset_dict["shape"] + ("CJitter" if "shape" in apply_ColorJitter else "") + "Shape"
+        dataset_texture = dataset_dict["texture"] + f"PatchSize{patch_size}" + ("CJitter" if "texture" in apply_ColorJitter else "") + "Texture"
+        datasets_corr_coef = dataset_shape + "_" + dataset_texture
+
+        if "color" in dataset_dict:
+            dataset_color = dataset_dict["color"] + "PixelShuffledColor"
+            datasets_corr_coef += "_" + dataset_color
+
+    path_corr_coef_shape_bias = os.path.join(path_folder, f"val_{epoch}", "shapeBiasMetrics", "CorrelationCoefficient", datasets_corr_coef)
+    os.makedirs(path_corr_coef_shape_bias, exist_ok=True)
+
+    df_dims.index = [datasets_corr_coef]
+    df_dims.to_csv(os.path.join(path_corr_coef_shape_bias, "pred_dims.csv"))
+
+
+def save_correlation_coefficient_shape_bias_to_csv_file_for_many(models_dict, df_dimensions, dataset_dict, apply_ColorJitter=[], patch_size=30):
+    for m in models_dict:
+        root_model, _ = models_dict[m]
+        df_dims = df_dimensions.loc[[m]]
+
+        save_correlation_coefficient_shape_bias_to_csv_file(root_model, df_dims, dataset_dict, apply_ColorJitter, patch_size)
 
 
 # Feature Embedding Distances
@@ -407,6 +548,7 @@ def load_compute_orig_diff_embeddings(root_model, dataset_orig, dataset_diff, cu
         root_dataset_train_orig, root_dataset_test_orig = ut_val.get_root_dataset(dataset=dataset_orig)
         root_dataset_train_diff, root_dataset_test_diff = ut_val.get_root_dataset(dataset=dataset_diff)
 
+        # original and diffused images get loaded pair wise and therefor is this match also in the computed feature embeddings
         _, val_loader = ut_val.set_dataloader("", params, root_dataset_train_orig, root_dataset_test_orig, root_dataset_train_diff, root_dataset_test_diff, aug_dict)
 
         model = ut_val.set_model(root_model, params, cuda_device)
@@ -419,9 +561,38 @@ def load_compute_orig_diff_embeddings(root_model, dataset_orig, dataset_diff, cu
             embedding_orig = entry['data']
             class_labels = entry['labels']
 
+            # load the image names (or compute and store them for the future)
+            if "images" in entry:
+                images_orig = entry["images"]
+            else:
+                print(f"{dataset_orig}: Image names not found in precomputed embeddings! Recompute them and store them wich image names!")
+                root_dataset_train_orig, root_dataset_test_orig = ut_val.get_root_dataset(dataset=dataset_orig)
+
+                train_loader, val_loader = ut_val.set_dataloader(dataset_orig, params, root_dataset_train_orig, root_dataset_test_orig)
+                model = ut_val.set_model(root_model, params, cuda_device)
+
+                _, _, _, embedding_orig, class_labels, images_orig = ut_val.compute_and_save_embeddings(model, train_loader, val_loader, path_embeddings_orig, params, cuda_device)
+            # use image names to sort the feature embeddings and class labels so that they match up with the other embeddings
+            embedding_orig = embedding_orig[np.argsort(images_orig)]
+            class_labels = class_labels[np.argsort(images_orig)]
+
         with open(os.path.join(path_embeddings_diff, "embedding_test"), 'rb') as f:
             entry = pickle.load(f, encoding='latin1')
             embedding_diff = entry['data']
+
+             # load the image names (or compute and store them for the future)
+            if "images" in entry:
+                images_diff = entry["images"]
+            else:
+                print(f"{dataset_diff}: Image names not found in precomputed embeddings! Recompute them and store them wich image names!")
+                root_dataset_train_diff, root_dataset_test_diff = ut_val.get_root_dataset(dataset=dataset_diff)
+
+                train_loader, val_loader = ut_val.set_dataloader(dataset_diff, params, root_dataset_train_diff, root_dataset_test_diff)
+                model = ut_val.set_model(root_model, params, cuda_device)
+
+                _, _, _, embedding_diff, _, images_diff = ut_val.compute_and_save_embeddings(model, train_loader, val_loader, path_embeddings_diff, params, cuda_device)
+            # use image names to sort the feature embeddings so that they match up with the other embeddings
+            embedding_diff = embedding_diff[np.argsort(images_diff)]
 
     return embedding_orig, embedding_diff, class_labels
 

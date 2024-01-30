@@ -575,8 +575,39 @@ def create_shape_bias_md(path_folder):
                 if len(lines_datasets[dset]) > 0:
                     lines.extend(lines_datasets[dset])
 
-    # Estimated Feature Dimensions Shape Bias Metric
+    # Correlation Coefficient Shape Bias Metric
+    # collect epochs and datasets
+    corr_coef_paths = glob.glob(os.path.join(path_folder, "val_*", "shapeBiasMetrics", "CorrelationCoefficient", "*", "pred_dims.csv"))
+    corr_coef_datasets = sorted(set([corr_coef_path.split('/')[-2] for corr_coef_path in corr_coef_paths]))
+    epochs_corr_coef = [e.replace(' ', '') for e in sorted(set([f"{corr_coef_path.split('/')[-5].replace('val_', ''):>3}" for corr_coef_path in corr_coef_paths]))]
+    if len(cue_conf_paths) > 0:
+        lines.append("## Correlation Coefficient Shape Bias Metric\n\n")
 
+    # create for each epoch one table with estimated dimensions for all datasets
+    for e in epochs_corr_coef:
+        list_df_dims = []
+        for dset in corr_coef_datasets:
+            dims_paths = glob.glob(os.path.join(path_folder, f"val_{e}", "shapeBiasMetrics", "CorrelationCoefficient", dset, "pred_dims.csv"))
+
+            if len(sb_paths) == 1:
+                df_dims = pd.read_csv(dims_paths[0], index_col=0)
+                list_df_dims.append(df_dims)
+        
+        if len(list_df_dims) > 0:
+            lines.extend([f"### Epoch {e}\n\n",
+                          "**(in brackets are the estimated image component dimensions divided by the total number of dimensions of the feature space)**\n"])
+            df_dimensions = pd.concat(list_df_dims, axis=0)
+            embedding_size = np.nan_to_num(df_dimensions.values[0]).sum()
+            df_dimensions = df_dimensions.map(lambda x: "" if np.isnan(x) else f"{int(x)} ({x/embedding_size:.4f})")
+
+            columns = df_dimensions.columns.to_numpy()
+            rem_dim_idx = np.where(columns == "remaining_dims")[0][0]
+            if rem_dim_idx < len(columns)-1:
+                columns = np.concatenate([columns[:rem_dim_idx], columns[rem_dim_idx+1:], [columns[rem_dim_idx]]])
+                df_dimensions = df_dimensions[columns]
+            df_dimensions = df_dimensions.reset_index(names="datasets")
+
+            lines.extend(md_table_from_dict(df_dimensions))
 
     # write the markdown file
     if len(lines) > 1:
