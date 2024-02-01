@@ -589,7 +589,7 @@ def create_shape_bias_md(path_folder):
         for dset in corr_coef_datasets:
             dims_paths = glob.glob(os.path.join(path_folder, f"val_{e}", "shapeBiasMetrics", "CorrelationCoefficient", dset, "pred_dims.csv"))
 
-            if len(sb_paths) == 1:
+            if len(dims_paths) == 1:
                 df_dims = pd.read_csv(dims_paths[0], index_col=0)
                 list_df_dims.append(df_dims)
         
