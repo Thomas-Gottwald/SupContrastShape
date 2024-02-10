@@ -24,25 +24,28 @@ def main():
 
     for split in ["train", "test"]:
         print(f"Data split {split}")
-        print("load feature embedding")
-        with open(os.path.join(path, f"embedding_{split}"), 'rb') as f:
-            entry = pickle.load(f, encoding='latin1')
-            embedding = entry['data']
+        if os.path.isfile(os.path.join(path, f"embedding_{split}")):
+            print("load feature embedding")
+            with open(os.path.join(path, f"embedding_{split}"), 'rb') as f:
+                entry = pickle.load(f, encoding='latin1')
+                embedding = entry['data']
 
-        if path_second:
-            print("load second feature embedding")
-            with open(os.path.join(path_second, f"embedding_{split}"), 'rb') as f:
-                entry_second = pickle.load(f, encoding='latin1')
-                embedding = np.append(embedding, entry_second['data'], axis=0)
-                entry['labels'] = np.append(entry['labels'], entry_second['labels'])
+            if path_second:
+                print("load second feature embedding")
+                with open(os.path.join(path_second, f"embedding_{split}"), 'rb') as f:
+                    entry_second = pickle.load(f, encoding='latin1')
+                    embedding = np.append(embedding, entry_second['data'], axis=0)
+                    entry['labels'] = np.append(entry['labels'], entry_second['labels'])
 
-        print("compute t-SNE embedding")
-        embedding_tSNE = tsnecuda.TSNE(n_components=2, perplexity=30, learning_rate=10).fit_transform(embedding)
+            print("compute t-SNE embedding")
+            embedding_tSNE = tsnecuda.TSNE(n_components=2, perplexity=30, learning_rate=10).fit_transform(embedding)
 
-        print("writ t-SNE embedding")
-        entry['data'] = embedding_tSNE
-        with open(os.path.join(path_save, f"embedding_tSNE_{split}"), 'wb') as f:
-            pickle.dump(entry, f, protocol=-1)
+            print("writ t-SNE embedding")
+            entry['data'] = embedding_tSNE
+            with open(os.path.join(path_save, f"embedding_tSNE_{split}"), 'wb') as f:
+                pickle.dump(entry, f, protocol=-1)
+        else:
+            print(f"No {split} data not found!")
 
 
 if __name__ == '__main__':

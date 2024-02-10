@@ -3,7 +3,6 @@ import pickle
 import numpy as np
 import pandas as pd
 import torch
-import torch.nn.functional as nnf
 import matplotlib.pyplot as plt
 import seaborn
 from torchvision import transforms, datasets
@@ -15,6 +14,7 @@ from networks.resnet_big import model_dict
 from util.util_logging import open_csv_file
 from util.util import TwoCropTransform
 from util.util_diff import SameTwoApply
+from util.util_diff import ShufflePatches, TwoDifferentApply
 
 
 # Cue Conflict Shape Bias
@@ -190,49 +190,6 @@ def save_cue_conflict_shape_bias_to_csv_file_for_many(models_dict, df_biases, cl
 
 
 # Correlation Coefficient Shape Bias
-class ShufflePatches:
-    # inspired from https://stackoverflow.com/questions/66962837/shuffle-patches-in-image-batch
-    def __init__(self, patch_size):
-        self.patch_size = patch_size
-
-    def __call__(self, x):
-        # unfold the tensor image
-        u = nnf.unfold(x, kernel_size=self.patch_size , stride=self.patch_size , padding=0)
-        # shuffle the patches in unfolded form
-        pu = u[:,torch.randperm(u.shape[-1])]
-        # fold the tensor back in its original form
-        f = nnf.fold(pu, x.shape[-2:], kernel_size=self.patch_size, stride=self.patch_size, padding=0)
-
-        return f
-    
-    def apply_to_batch(self, x):
-        # unfold the tensor image
-        u = nnf.unfold(x, kernel_size=self.patch_size , stride=self.patch_size , padding=0)
-        # shuffle the patches in unfolded form
-        pu = torch.stack([b_[:,torch.randperm(b_.shape[-1])] for b_ in u], dim=0)
-        # fold the tensor back in its original form
-        f = nnf.fold(pu, x.shape[-2:], kernel_size=self.patch_size, stride=self.patch_size, padding=0)
-
-        return f
-    
-
-class TwoDifferentApply:
-
-    def __init__(self, transform_orig=None, transform_diff=None):
-        self.transform_orig = transform_orig
-        self.transform_diff = transform_diff
-
-    def __call__(self, x):
-        x_orig, x_diff = x
-
-        if self.transform_orig:
-            x_orig = self.transform_orig(x_orig)
-        if self.transform_diff:
-            x_diff = self.transform_diff(x_diff)
-
-        return [x_orig, x_diff]
-
-
 def compute_load_orig_shape_texture_embeddings(root_model, dataset_orig, dataset_shape, cuda_device, separate_color=False, apply_ColorJitter=[], patch_size=30):
     path_folder, path_embeddings_orig, path_embeddings_diff, _ = ut_val.get_paths_from_model_checkpoint(root_model, dataset_1=dataset_orig, dataset_2=dataset_shape)
     params = open_csv_file(os.path.join(path_folder, "params.csv"))

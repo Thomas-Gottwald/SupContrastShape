@@ -22,6 +22,7 @@ from matplotlib.collections import PatchCollection
 from networks.resnet_big import SupCEResNet, SupConResNet, LinearClassifier, model_dict
 from util.util_diff import DiffLoader, DiffTransform
 from util.util_diff import SameTwoRandomResizedCrop, SameTwoColorJitter, SameTwoApply
+from util.util_diff import ShufflePatches, ShuffleInnerPatches
 from util.util_logging import compute_accuracies_form_cm, save_confusion_matrix, open_csv_file
 from util.util_pre_com_feat import featureEmbeddingDataset
 
@@ -60,7 +61,7 @@ def get_root_dataset(dataset):
     elif dataset == "city_classification_diff":
         root_train = "./datasets/city_classification/EEDv2_5792_as_Original5/train/"
         root_test = "./datasets/city_classification/EEDv2_5792_as_Original5/val/"
-    elif dataset == "shape_texture_conflict_animals10_twe":
+    elif dataset == "shape_texture_conflict_animals10_two":
         root_train = None
         root_test = "./datasets/adaIN/shape_texture_conflict_animals10_two/"
     elif dataset == "shape_texture_conflict_animals10_many":
@@ -69,11 +70,32 @@ def get_root_dataset(dataset):
     elif dataset == "stylized_animals10":
         root_train = None
         root_test = "./datasets/adaIN/stylized_animals10/test/"
+    elif dataset in ["animals10_diff_-1PatchSize30",  "animals10_diff_-1PatchSize30CJitter",
+                    "animals10_diff_-1InnerPatchSize30",  "animals10_diff_-1InnerPatchSize30CJitter",
+                     "animals10_diff_-1PixelShuffled"]:
+        root_train = None
+        root_test = "./datasets/animals10_diff/-1/test/"
     else:
         root_train = None
         root_test = None
 
     return root_train, root_test
+
+def get_dataset_augmentations(dataset):
+    aug_dict = None
+
+    if dataset == "animals10_diff_-1PatchSize30":
+        aug_dict = {"aug": ["shufflePatches"], "shufflePatches": 30}
+    elif dataset == "animals10_diff_-1PatchSize30CJitter":
+        aug_dict = {"aug": ["colorJitter", "shufflePatches"], "shufflePatches": 30, "colorJitter": [1.0, 0.4, 0.4, 0.4, 0.4]}
+    elif dataset == "animals10_diff_-1InnerPatchSize30":
+        aug_dict = {"aug": ["shuffleInnerPatches"], "shufflePatches": 30}
+    elif dataset == "animals10_diff_-1InnerPatchSize30CJitter":
+        aug_dict = {"aug": ["colorJitter", "shuffleInnerPatches"], "shufflePatches": 30, "colorJitter": [1.0, 0.4, 0.4, 0.4, 0.4]}
+    elif dataset == "animals10_diff_-1PixelShuffled":
+        aug_dict = {"aug": ["shufflePatches"], "shufflePatches": 1}
+
+    return aug_dict
 
 
 def get_classes(dataset):
@@ -267,7 +289,7 @@ def collect_models_dict(save_root="./save/", epoch="last", method="", dataset=""
 
 # Dataloader and Model
 def set_data_transforms(params, aug=[],
-                        resizedCrop=[0.2, 1.0, 3/4, 4/3], horizontalFlip=0.5, colorJitter=[0.8, 0.4, 0.4, 0.4, 0.4], grayscale=0.2):
+                        resizedCrop=[0.2, 1.0, 3/4, 4/3], horizontalFlip=0.5, colorJitter=[0.8, 0.4, 0.4, 0.4, 0.4], grayscale=0.2, shufflePatches=30):
     normalize = transforms.Normalize(mean=params['mean'], std=params['std'])
 
     same_transform_list = []
@@ -306,6 +328,11 @@ def set_data_transforms(params, aug=[],
         transforms.ToTensor(),
         normalize
     ])
+
+    if 'shufflePatches' in aug:
+        transform_list.append(ShufflePatches(patch_size=shufflePatches))
+    elif 'shuffleInnerPatches' in aug:
+        transform_list.append(ShuffleInnerPatches(patch_size=shufflePatches))
 
     if len(same_transform_list) > 0:
         aug_same_transform = transforms.Compose(same_transform_list)
@@ -350,17 +377,29 @@ def set_dataloader(dataset, params, root_train_1, root_test_1, root_train_2=None
                                             train=False,
                                             transform=val_transform)
         else:
-            train_dataset = datasets.ImageFolder(root=root_train_1,
-                                                 transform=val_transform)
-            val_dataset = datasets.ImageFolder(root=root_test_1,
-                                               transform=val_transform)
-            
-    train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=params['batch_size'], shuffle=False,
-        num_workers=16, pin_memory=True)
-    val_loader = torch.utils.data.DataLoader(
-        val_dataset, batch_size=params['batch_size'], shuffle=False,
-        num_workers=8, pin_memory=True)
+            if root_train_1:
+                train_dataset = datasets.ImageFolder(root=root_train_1,
+                                                    transform=val_transform)
+            else:
+                train_dataset = None
+            if root_test_1:
+                val_dataset = datasets.ImageFolder(root=root_test_1,
+                                                transform=val_transform)
+            else:
+                val_dataset = None
+    
+    if train_dataset is not None:
+        train_loader = torch.utils.data.DataLoader(
+            train_dataset, batch_size=params['batch_size'], shuffle=False,
+            num_workers=16, pin_memory=True)
+    else:
+        train_loader = None
+    if val_dataset is not None:
+        val_loader = torch.utils.data.DataLoader(
+            val_dataset, batch_size=params['batch_size'], shuffle=False,
+            num_workers=8, pin_memory=True)
+    else:
+        val_loader = None
         
     return train_loader, val_loader
 
@@ -446,20 +485,26 @@ def compute_and_save_embeddings(model, train_loader, val_loader, path_embeddings
         os.makedirs(path_embeddings)
 
     # Trainings Data
-    embedding_train, class_labels_train = compute_embedding(model, train_loader, params, cuda_device)
-    images_train = [img[0].replace(train_loader.dataset.root, '') for img in train_loader.dataset.imgs]
+    if train_loader is not None:
+        embedding_train, class_labels_train = compute_embedding(model, train_loader, params, cuda_device)
+        images_train = [img[0].replace(train_loader.dataset.root, '') for img in train_loader.dataset.imgs]
 
-    entry = {'data': embedding_train, 'labels': class_labels_train, 'images': images_train}
-    with open(os.path.join(path_embeddings, "embedding_train"), 'wb') as f:
-        pickle.dump(entry, f, protocol=-1)
+        entry = {'data': embedding_train, 'labels': class_labels_train, 'images': images_train}
+        with open(os.path.join(path_embeddings, "embedding_train"), 'wb') as f:
+            pickle.dump(entry, f, protocol=-1)
+    else:
+        embedding_train, class_labels_train, images_train = None, None, None
 
     # Test Data
-    embedding_test, class_labels_test = compute_embedding(model, val_loader, params, cuda_device)
-    images_test = [img[0].replace(val_loader.dataset.root, '') for img in val_loader.dataset.imgs]
+    if val_loader is not None:
+        embedding_test, class_labels_test = compute_embedding(model, val_loader, params, cuda_device)
+        images_test = [img[0].replace(val_loader.dataset.root, '') for img in val_loader.dataset.imgs]
 
-    entry = {'data': embedding_test, 'labels': class_labels_test, 'images': images_test}
-    with open(os.path.join(path_embeddings, "embedding_test"), 'wb') as f:
-        pickle.dump(entry, f, protocol=-1)
+        entry = {'data': embedding_test, 'labels': class_labels_test, 'images': images_test}
+        with open(os.path.join(path_embeddings, "embedding_test"), 'wb') as f:
+            pickle.dump(entry, f, protocol=-1)
+    else:
+        embedding_test, class_labels_test, images_test = None, None, None
 
     return embedding_train, class_labels_train, images_train, embedding_test, class_labels_test, images_test
 
@@ -468,80 +513,108 @@ def compute_and_save_embeddings(model, train_loader, val_loader, path_embeddings
 def save_tSNE_plots(dataset, path_embeddings, params, epoch):
     seaborn.set_theme(style="darkgrid")
 
-    with open(os.path.join(path_embeddings, "embedding_tSNE_train"), 'rb') as f:
-        entry = pickle.load(f, encoding='latin1')
-        embedding_tSNE_train = entry['data']
-        labels_train = entry['labels']
-    df_train = pd.DataFrame.from_dict({'x': embedding_tSNE_train[:,0], 'y': embedding_tSNE_train[:,1], 'label': labels_train})
-
-    with open(os.path.join(path_embeddings, "embedding_tSNE_test"), 'rb') as f:
-        entry = pickle.load(f, encoding='latin1')
-        embedding_tSNE_test = entry['data']
-        labels_test = entry['labels']
-    df_test = pd.DataFrame.from_dict({'x': embedding_tSNE_test[:,0], 'y': embedding_tSNE_test[:,1], 'label': labels_test})
-
     classes = get_classes(dataset)
     if classes:
-        df_train['class'] = df_train['label'].map(lambda l: classes[l])
-        df_test['class'] = df_test['label'].map(lambda l: classes[l])
+        cmap = 'tab10' if len(classes)<=10 else 'tab20'
     else:
-        df_train['class'] = df_train['label']
-        df_test['class'] = df_test['label']
+        cmap = 'tab20'
 
-    cmap = 'tab10' if len(classes)<=10 else 'tab20'
-    fig, ax = plt.subplots(figsize=(6, 5))
-    fig.tight_layout()
-    seaborn.scatterplot(df_train, x='x', y='y', hue='class', palette=cmap, ax=ax)
-    ax.collections[0].set_sizes([10])
-    ax.set_title(f"Data: {dataset} (Train)\nModel: {params['model']}, bsz={params['batch_size']} (epoch {epoch})", y=1.2)
-    ax.legend(loc='upper center', ncols=4, bbox_to_anchor=(0.5,1.22))
-    fig.savefig(os.path.join(path_embeddings, f"tSNE_epoch_{epoch}_train.png"), bbox_inches="tight")
+    # trainings data
+    if os.path.isfile(os.path.join(path_embeddings, "embedding_tSNE_train")):
+        with open(os.path.join(path_embeddings, "embedding_tSNE_train"), 'rb') as f:
+            entry = pickle.load(f, encoding='latin1')
+            embedding_tSNE_train = entry['data']
+            labels_train = entry['labels']
+        df_train = pd.DataFrame.from_dict({'x': embedding_tSNE_train[:,0], 'y': embedding_tSNE_train[:,1], 'label': labels_train})
 
-    fig, ax = plt.subplots(figsize=(6, 5))
-    fig.tight_layout()
-    seaborn.scatterplot(df_test, x='x', y='y', hue='class', palette=cmap, ax=ax)
-    ax.collections[0].set_sizes([10])
-    ax.set_title(f"Data: {dataset} (Test)\nModel: {params['model']}, bsz={params['batch_size']} (epoch {epoch})", y=1.2)
-    ax.legend(loc='upper center', ncols=4, bbox_to_anchor=(0.5,1.22))
-    fig.savefig(os.path.join(path_embeddings, f"tSNE_epoch_{epoch}_test.png"), bbox_inches="tight")
+        if classes:
+            df_train['class'] = df_train['label'].map(lambda l: classes[l])
+        else:
+            df_train['class'] = df_train['label']
+
+        fig, ax = plt.subplots(figsize=(6, 5))
+        fig.tight_layout()
+        seaborn.scatterplot(df_train, x='x', y='y', hue='class', palette=cmap, ax=ax)
+        ax.collections[0].set_sizes([10])
+        ax.set_title(f"Data: {dataset} (Train)\nModel: {params['model']}, bsz={params['batch_size']} (epoch {epoch})", y=1.2)
+        ax.legend(loc='upper center', ncols=4, bbox_to_anchor=(0.5,1.22))
+        fig.savefig(os.path.join(path_embeddings, f"tSNE_epoch_{epoch}_train.png"), bbox_inches="tight")
+
+    # test data
+    if os.path.isfile(os.path.join(path_embeddings, "embedding_tSNE_test")):
+        with open(os.path.join(path_embeddings, "embedding_tSNE_test"), 'rb') as f:
+            entry = pickle.load(f, encoding='latin1')
+            embedding_tSNE_test = entry['data']
+            labels_test = entry['labels']
+        df_test = pd.DataFrame.from_dict({'x': embedding_tSNE_test[:,0], 'y': embedding_tSNE_test[:,1], 'label': labels_test})
+
+        if classes:
+            df_test['class'] = df_test['label'].map(lambda l: classes[l])
+        else:
+            df_test['class'] = df_test['label']
+
+        fig, ax = plt.subplots(figsize=(6, 5))
+        fig.tight_layout()
+        seaborn.scatterplot(df_test, x='x', y='y', hue='class', palette=cmap, ax=ax)
+        ax.collections[0].set_sizes([10])
+        ax.set_title(f"Data: {dataset} (Test)\nModel: {params['model']}, bsz={params['batch_size']} (epoch {epoch})", y=1.2)
+        ax.legend(loc='upper center', ncols=4, bbox_to_anchor=(0.5,1.22))
+        fig.savefig(os.path.join(path_embeddings, f"tSNE_epoch_{epoch}_test.png"), bbox_inches="tight")
 
 
 def plot_tSNE(dataset, path_embeddings, params, epoch):
     seaborn.set_theme(style="darkgrid")
 
-    with open(os.path.join(path_embeddings, "embedding_tSNE_train"), 'rb') as f:
-        entry = pickle.load(f, encoding='latin1')
-        embedding_tSNE_train = entry['data']
-        labels_train = entry['labels']
-    df_train = pd.DataFrame.from_dict({'x': embedding_tSNE_train[:,0], 'y': embedding_tSNE_train[:,1], 'label': labels_train})
-
-    with open(os.path.join(path_embeddings, "embedding_tSNE_test"), 'rb') as f:
-        entry = pickle.load(f, encoding='latin1')
-        embedding_tSNE_test = entry['data']
-        labels_test = entry['labels']
-    df_test = pd.DataFrame.from_dict({'x': embedding_tSNE_test[:,0], 'y': embedding_tSNE_test[:,1], 'label': labels_test})
-
     classes = get_classes(dataset)
     if classes:
-        df_train['class'] = df_train['label'].map(lambda l: classes[l])
-        df_test['class'] = df_test['label'].map(lambda l: classes[l])
+        cmap = 'tab10' if len(classes)<=10 else 'tab20'
     else:
-        df_train['class'] = df_train['label']
-        df_test['class'] = df_test['label']
+        cmap = 'tab20'
 
-    cmap = 'tab10' if len(classes)<=10 else 'tab20'
-    fig, axs = plt.subplots(ncols=2, figsize=(13, 5))
-    fig.tight_layout(w_pad=6)
+    if os.path.isfile(os.path.join(path_embeddings, "embedding_tSNE_train")) and os.path.isfile(os.path.join(path_embeddings, "embedding_tSNE_test")):
+        fig, axs = plt.subplots(ncols=2, figsize=(13, 5))
+        fig.tight_layout(w_pad=6)
+        ax_train, ax_val = axs[0], axs[1]
+    else:
+        fig, ax = plt.subplots(ncols=1, figsize=(6, 5))
+        fig.tight_layout()
+        ax_train, ax_val = ax, ax
 
-    seaborn.scatterplot(df_train, x='x', y='y', hue='class', palette=cmap, ax=axs[0])
-    axs[0].collections[0].set_sizes([10])
-    axs[0].set_title(f"Data: {dataset} (Train)\nModel: {params['model']}, bsz={params['batch_size']} (epoch {epoch})", y=1.2)
-    axs[0].legend(loc='upper center', ncols=4, bbox_to_anchor=(0.5,1.2))
+    # trainings data
+    if os.path.isfile(os.path.join(path_embeddings, "embedding_tSNE_train")):
+        with open(os.path.join(path_embeddings, "embedding_tSNE_train"), 'rb') as f:
+            entry = pickle.load(f, encoding='latin1')
+            embedding_tSNE_train = entry['data']
+            labels_train = entry['labels']
+        df_train = pd.DataFrame.from_dict({'x': embedding_tSNE_train[:,0], 'y': embedding_tSNE_train[:,1], 'label': labels_train})
 
-    seaborn.scatterplot(df_test, x='x', y='y', hue='class', palette=cmap, ax=axs[1])
-    axs[1].collections[0].set_sizes([10])
-    axs[1].set_title(f"Data: {dataset} (Test)\nModel: {params['model']}, bsz={params['batch_size']} (epoch {epoch})", y=1.2)
-    axs[1].legend(loc='upper center', ncols=4, bbox_to_anchor=(0.5,1.2))
+        if classes:
+            df_train['class'] = df_train['label'].map(lambda l: classes[l])
+        else:
+            df_train['class'] = df_train['label']
+
+        seaborn.scatterplot(df_train, x='x', y='y', hue='class', palette=cmap, ax=ax_train)
+        ax_train.collections[0].set_sizes([10])
+        ax_train.set_title(f"Data: {dataset} (Train)\nModel: {params['model']}, bsz={params['batch_size']} (epoch {epoch})", y=1.2)
+        ax_train.legend(loc='upper center', ncols=4, bbox_to_anchor=(0.5,1.2))
+
+    # test data
+    if os.path.isfile(os.path.join(path_embeddings, "embedding_tSNE_test")):
+        with open(os.path.join(path_embeddings, "embedding_tSNE_test"), 'rb') as f:
+            entry = pickle.load(f, encoding='latin1')
+            embedding_tSNE_test = entry['data']
+            labels_test = entry['labels']
+        df_test = pd.DataFrame.from_dict({'x': embedding_tSNE_test[:,0], 'y': embedding_tSNE_test[:,1], 'label': labels_test})
+
+        if classes:
+            df_test['class'] = df_test['label'].map(lambda l: classes[l])
+        else:
+            df_test['class'] = df_test['label']
+
+        seaborn.scatterplot(df_test, x='x', y='y', hue='class', palette=cmap, ax=ax_val)
+        ax_val.collections[0].set_sizes([10])
+        ax_val.set_title(f"Data: {dataset} (Test)\nModel: {params['model']}, bsz={params['batch_size']} (epoch {epoch})", y=1.2)
+        ax_val.legend(loc='upper center', ncols=4, bbox_to_anchor=(0.5,1.2))
 
 
 # Classifier
@@ -591,16 +664,22 @@ def load_classifier_checkpoint(path_classifier, model_name, num_classes, cuda_de
 
 
 def set_up_classifier(root_model, dataset_classifier, path_embeddings, params, cuda_device):
-    train_dataset = featureEmbeddingDataset(root=os.path.join(path_embeddings, 'embedding_train'))
+    if os.path.isfile(os.path.join(path_embeddings, 'embedding_train')):
+        train_dataset = featureEmbeddingDataset(root=os.path.join(path_embeddings, 'embedding_train'))
+        train_loader = torch.utils.data.DataLoader(
+            train_dataset, batch_size=256, shuffle=False,
+            num_workers=16, pin_memory=True)
+    else:
+        train_loader = None
 
-    val_dataset = featureEmbeddingDataset(root=os.path.join(path_embeddings, 'embedding_test'))
+    if os.path.isfile(os.path.join(path_embeddings, 'embedding_test')):
+        val_dataset = featureEmbeddingDataset(root=os.path.join(path_embeddings, 'embedding_test'))
 
-    train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=256, shuffle=False,
-        num_workers=16, pin_memory=True)
-    val_loader = torch.utils.data.DataLoader(
-        val_dataset, batch_size=256, shuffle=False,
-        num_workers=16, pin_memory=True)
+        val_loader = torch.utils.data.DataLoader(
+            val_dataset, batch_size=256, shuffle=False,
+            num_workers=16, pin_memory=True)
+    else:
+        val_loader = None
 
     if 'method' in params:
         path_classifier = get_path_classifier(root_model=root_model, dataset_classifier=dataset_classifier, params=params)
@@ -646,14 +725,6 @@ def compute_accuracies(C):
 def compute_and_save_confusion_matrix(root_model, dataset_classifier, path_embeddings, params, epoch, cuda_device):
     classifier, train_loader, val_loader = set_up_classifier(root_model, dataset_classifier, path_embeddings, params, cuda_device)
 
-    df_pred_train = get_predictions(classifier, train_loader, cuda_device)
-    df_pred_val = get_predictions(classifier, val_loader, cuda_device)
-
-    C_train = get_confusion_matrix(df_pred_train)
-    acc_train, acc_b_train = compute_accuracies(C_train)
-    C_val = get_confusion_matrix(df_pred_val)
-    acc_val, acc_b_val = compute_accuracies(C_val)
-
     dataset = path_embeddings.split('/')[-2].replace("val_", '').replace(f"_{epoch}", '')
     if re.fullmatch(f"val_.+_{epoch}", dataset):
         dataset = dataset.replace("val_", '')
@@ -661,11 +732,31 @@ def compute_and_save_confusion_matrix(root_model, dataset_classifier, path_embed
     classes = get_classes(dataset)
 
     os.makedirs(os.path.join(*path_embeddings.split('/')[:-1], "cm"), exist_ok=True)
-    save_confusion_matrix(C_train, classes, title=f"Confusion Matrix {dataset} (Train) (epoch: {epoch})",
-                        path=os.path.join(*path_embeddings.split('/')[:-1], "cm", f"cm_train_epoch_{epoch}.png"))
-    save_confusion_matrix(C_val, classes, title=f"Confusion Matrix {dataset} (Test) (epoch: {epoch})",
-                        path=os.path.join(*path_embeddings.split('/')[:-1], "cm", f"cm_val_epoch_{epoch}.png"))
-    
+
+    # trainings data
+    if train_loader is not None:
+        df_pred_train = get_predictions(classifier, train_loader, cuda_device)
+
+        C_train = get_confusion_matrix(df_pred_train)
+        acc_train, acc_b_train = compute_accuracies(C_train)
+
+        save_confusion_matrix(C_train, classes, title=f"Confusion Matrix {dataset} (Train) (epoch: {epoch})",
+                            path=os.path.join(*path_embeddings.split('/')[:-1], "cm", f"cm_train_epoch_{epoch}.png"))
+    else:
+        C_train, acc_train, acc_b_train = None, None, None
+
+    # validation data
+    if val_loader is not None:
+        df_pred_val = get_predictions(classifier, val_loader, cuda_device)
+
+        C_val = get_confusion_matrix(df_pred_val)
+        acc_val, acc_b_val = compute_accuracies(C_val)
+
+        save_confusion_matrix(C_val, classes, title=f"Confusion Matrix {dataset} (Test) (epoch: {epoch})",
+                            path=os.path.join(*path_embeddings.split('/')[:-1], "cm", f"cm_val_epoch_{epoch}.png"))
+    else:
+        C_val, acc_val, acc_b_val = None, None, None
+
     return C_train, acc_train, acc_b_train, C_val, acc_val, acc_b_val
     
 

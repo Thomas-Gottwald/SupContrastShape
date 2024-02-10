@@ -344,29 +344,27 @@ def create_cm_md(path_folder):
         acc_dict_val[dset] = []
         for e in epochs_cm:
             cm_plot_paths = glob.glob(os.path.join(path_folder, f"val_{e}", dset, "cm", f"cm_*_epoch_{e}.png"))
-            if len(cm_plot_paths) == 2:
+            cm_path_train = glob.glob(os.path.join(path_folder, f"val_{e}", dset, "cm", f"cm_train_epoch_{e}.csv"))
+            cm_path_val = glob.glob(os.path.join(path_folder, f"val_{e}", dset, "cm", f"cm_val_epoch_{e}.csv"))
+            if 0 < len(cm_plot_paths) <= 2 or len(cm_path_train) == 1 or len(cm_path_val) == 1:
                 cm_plot_dict[e].append(f"#### Dataset: {dset}\n\n")
 
 
-            cm_path_train = glob.glob(os.path.join(path_folder, f"val_{e}", dset, "cm", f"cm_train_epoch_{e}.csv"))
             if len(cm_path_train) == 1:
                 C_train = load_confusion_matrix(cm_path_train[0])
                 acc_train, acc_b_train = compute_accuracies_form_cm(C_train)
 
                 acc_dict_train[dset].append(f"{acc_train*100:.2f} ({acc_b_train*100:.2f})")
-                if len(cm_plot_paths) == 2:
-                    cm_plot_dict[e].append(f"- **Training Data: Accuracy: {acc_train*100:.2f}, Class Balanced Accuracy: {acc_b_train*100:.2f}**\n")
+                cm_plot_dict[e].append(f"- **Training Data: Accuracy: {acc_train*100:.2f}, Class Balanced Accuracy: {acc_b_train*100:.2f}**\n")
             else:
                 acc_dict_train[dset].append("")
 
-            cm_path_val = glob.glob(os.path.join(path_folder, f"val_{e}", dset, "cm", f"cm_val_epoch_{e}.csv"))
             if len(cm_path_val) == 1:
                 C_val = load_confusion_matrix(cm_path_val[0])
                 acc_val, acc_b_val = compute_accuracies_form_cm(C_val)
 
                 acc_dict_val[dset].append(f"{acc_val*100:.2f} ({acc_b_val*100:.2f})")
-                if len(cm_plot_paths) == 2:
-                    cm_plot_dict[e].append(f"- **Validation Data: Accuracy: {acc_val*100:.2f}, Class Balanced Accuracy: {acc_b_val*100:.2f}**\n")
+                cm_plot_dict[e].append(f"- **Validation Data: Accuracy: {acc_val*100:.2f}, Class Balanced Accuracy: {acc_b_val*100:.2f}**\n")
             else:
                 acc_dict_val[dset].append("")
 
@@ -375,6 +373,15 @@ def create_cm_md(path_folder):
                                         ":--:|:--:\n",
                                         f"![plot of confusion matrix trainings data]({os.path.join('.', f'val_{e}', dset, 'cm', f'cm_train_epoch_{e}.png')})|",
                                         f"![plot of confusion matrix test data]({os.path.join('.', f'val_{e}', dset, 'cm', f'cm_val_epoch_{e}.png')})\n\n"])
+            elif len(cm_plot_paths) == 1:
+                if os.path.isfile(os.path.join(path_folder, f'val_{e}', dset, 'cm', f'cm_train_epoch_{e}.png')):
+                    cm_plot_dict[e].extend([f"\n| {dset} Trainings Data |\n",
+                                            "|:--:|\n",
+                                            f"|![plot of confusion matrix trainings data]({os.path.join('.', f'val_{e}', dset, 'cm', f'cm_train_epoch_{e}.png')})|\n\n"])
+                elif os.path.isfile(os.path.join(path_folder, f'val_{e}', dset, 'cm', f'cm_val_epoch_{e}.png')):
+                    cm_plot_dict[e].extend([f"\n| {dset} Test Data |\n",
+                                            "|:--:|\n",
+                                            f"|![plot of confusion matrix test data]({os.path.join('.', f'val_{e}', dset, 'cm', f'cm_val_epoch_{e}.png')})|\n\n"])
 
     # tables for accuracies
     if len(acc_dict_train["epoch"]) > 0:
@@ -418,14 +425,25 @@ def create_tsne_md(path_folder):
     for e in epochs_tsne:
         plot_lines = []
         for dset in datasets_tsne:
-            cm_plot_paths = glob.glob(os.path.join(path_folder, f"val_{e}", dset, "embeddings", f"tSNE_epoch_{e}_*.png"))
+            tsne_plot_paths = glob.glob(os.path.join(path_folder, f"val_{e}", dset, "embeddings", f"tSNE_epoch_{e}_*.png"))
 
-            if len(cm_plot_paths) == 2:
+            if len(tsne_plot_paths) == 2:
                 plot_lines.extend([f"#### Dataset: {dset}\n\n",
                                    f"{dset} Trainings Data | {dset} Test Data\n",
                                    ":--:|:--:\n",
                                    f"![t-SNE plot of epoch last training data]({os.path.join('.', f'val_{e}', dset, 'embeddings', f'tSNE_epoch_{e}_train.png')})",
                                    f"|![t-SNE plot of epoch last test data]({os.path.join('.', f'val_{e}', dset, 'embeddings', f'tSNE_epoch_{e}_test.png')})\n\n"])
+            elif len(tsne_plot_paths) == 1:
+                if os.path.isfile(os.path.join(path_folder, f'val_{e}', dset, 'embeddings', f'tSNE_epoch_{e}_train.png')):
+                    plot_lines.extend([f"#### Dataset: {dset}\n\n",
+                                       f"| {dset} Trainings Data |\n",
+                                       "|:--:|\n",
+                                       f"|![t-SNE plot of epoch last training data]({os.path.join('.', f'val_{e}', dset, 'embeddings', f'tSNE_epoch_{e}_train.png')})|\n\n"])
+                elif os.path.isfile(os.path.join(path_folder, f'val_{e}', dset, 'embeddings', f'tSNE_epoch_{e}_test.png')):
+                    plot_lines.extend([f"#### Dataset: {dset}\n\n",
+                                       f"| {dset} Test Data |\n",
+                                       "|:--:|\n",
+                                       f"|![t-SNE plot of epoch last test data]({os.path.join('.', f'val_{e}', dset, 'embeddings', f'tSNE_epoch_{e}_test.png')})|\n\n"])
                 
         if len(plot_lines) > 0:
             lines.append(f"### Epoch {e}\n\n")

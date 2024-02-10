@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as nnf
 from torchvision import transforms, datasets
 
 
@@ -105,3 +106,99 @@ class DiffLoader:
 
     def __call__(self, path:str):
         return [self.loader(path), self.loader(path.replace(self.path_orig, self.path_diff))]
+    
+
+class ShufflePatches:
+    # inspired from https://stackoverflow.com/questions/66962837/shuffle-patches-in-image-batch
+    def __init__(self, patch_size):
+        self.patch_size = patch_size
+
+    def __call__(self, x):
+        # unfold the tensor image
+        u = nnf.unfold(x, kernel_size=self.patch_size , stride=self.patch_size , padding=0)
+        # shuffle the patches in unfolded form
+        pu = u[:,torch.randperm(u.shape[-1])]
+        # fold the tensor back in its original form
+        f = nnf.fold(pu, x.shape[-2:], kernel_size=self.patch_size, stride=self.patch_size, padding=0)
+
+        return f
+    
+    def apply_to_batch(self, x):
+        # unfold the tensor image
+        u = nnf.unfold(x, kernel_size=self.patch_size , stride=self.patch_size , padding=0)
+        # shuffle the patches in unfolded form
+        pu = torch.stack([b_[:,torch.randperm(b_.shape[-1])] for b_ in u], dim=0)
+        # fold the tensor back in its original form
+        f = nnf.fold(pu, x.shape[-2:], kernel_size=self.patch_size, stride=self.patch_size, padding=0)
+
+        return f
+    
+
+class ShuffleInnerPatches:
+    # inspired from https://stackoverflow.com/questions/66962837/shuffle-patches-in-image-batch
+    def __init__(self, patch_size, tol=0.2):
+        self.patch_size = patch_size
+        self.tol = tol
+
+    def __call__(self, x):
+        # detect zero padding
+        height, width = x.shape[1:]
+        
+        top = 0
+        while(torch.allclose(x[:,top,:], torch.tensor([0.0]), atol=self.tol)):
+            top += 1
+            if top > height//2:
+                break
+        top = ((top-1) // self.patch_size + 1) * self.patch_size
+
+        bottom = height-1
+        while(torch.allclose(x[:,bottom,:], torch.tensor([0.0]), atol=self.tol)):
+            bottom -= 1
+            if bottom < height//2:
+                break
+        bottom = ((bottom+1) // self.patch_size) * self.patch_size
+
+        left = 0
+        while(torch.allclose(x[:,:,left], torch.tensor([0.0]), atol=self.tol)):
+            left += 1
+            if left > width//2:
+                break
+        left = ((left-1) // self.patch_size + 1) * self.patch_size
+
+        right = width-1
+        while(torch.allclose(x[:,:,right], torch.tensor([0.0]), atol=self.tol)):
+            right -= 1
+            if right < width//2:
+                break
+        right = ((right+1) // self.patch_size) * self.patch_size
+
+        if top < bottom and left < right:
+            x_inner = x[:,top:bottom,left:right]
+            
+            # unfold the tensor image
+            u_inner = nnf.unfold(x_inner, kernel_size=self.patch_size , stride=self.patch_size , padding=0)
+            # shuffle the patches in unfolded form
+            pu_inner = u_inner[:,torch.randperm(u_inner.shape[-1])]
+            # fold the tensor back in its original form
+            f_inner = nnf.fold(pu_inner, x_inner.shape[-2:], kernel_size=self.patch_size, stride=self.patch_size, padding=0)
+
+            x[:,top:bottom,left:right] = f_inner
+
+        return x
+    
+
+class TwoDifferentApply:
+
+    def __init__(self, transform_orig=None, transform_diff=None):
+        self.transform_orig = transform_orig
+        self.transform_diff = transform_diff
+
+    def __call__(self, x):
+        x_orig, x_diff = x
+
+        if self.transform_orig:
+            x_orig = self.transform_orig(x_orig)
+        if self.transform_diff:
+            x_diff = self.transform_diff(x_diff)
+
+        return [x_orig, x_diff]
