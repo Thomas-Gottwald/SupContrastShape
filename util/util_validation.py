@@ -70,6 +70,9 @@ def get_root_dataset(dataset):
     elif dataset == "stylized_animals10":
         root_train = None
         root_test = "./datasets/adaIN/stylized_animals10/test/"
+    elif dataset == "stylized_city_classification":
+        root_train = None
+        root_test = "./datasets/adaIN/stylized_city_classification/test/"
     elif dataset in ["animals10_diff_-1PatchSize30",  "animals10_diff_-1PatchSize30CJitter",
                     "animals10_diff_-1InnerPatchSize30",  "animals10_diff_-1InnerPatchSize30CJitter",
                      "animals10_diff_-1PixelShuffled"]:
@@ -101,7 +104,7 @@ def get_dataset_augmentations(dataset):
 def get_classes(dataset):
     _, root_test = get_root_dataset(dataset)
     if root_test:
-        classes = [x[:-1].replace(root_test, '') for x in glob.glob(os.path.join(root_test, "*/"))]
+        classes = sorted([x[:-1].replace(root_test, '') for x in glob.glob(os.path.join(root_test, "*/"))])
 
         return classes
     else:
@@ -204,6 +207,9 @@ def check_exclude_with_params(params, exclude_params_dict=dict(), keep_params_di
             return False
         elif p == "aug":
             if set(keep_params_dict[p]).intersection(params[p]) != set(keep_params_dict[p]):
+                return False
+        elif type(keep_params_dict[p]) is list:
+            if params[p] not in keep_params_dict[p]:
                 return False
         elif params[p] != keep_params_dict[p]:
             return False

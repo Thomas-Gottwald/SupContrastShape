@@ -130,6 +130,13 @@ Training:
 CUDA_VISIBLE_DEVICES=2 nohup python main_ce.py --dataset city_classification_original --data_folder ./datasets/city_classification/Original/train/ --test_folder ./datasets/city_classification/Original/val/ --num_classes 11 --learning_rate 0.125 --cosine --model resnet18 --epochs 500 --size 300 --batch_size 26 --batch_size_val 26 --mean "(0.1667, 0.1889, 0.1641)" --std "(0.1941, 0.2075, 0.1908)" --tag cityBaseline > supCE_cityBaseline.out &
 ```
 
+## Cross Entropy Learning with city_classification_original with all augmentations
+
+Training:
+```
+CUDA_VISIBLE_DEVICES=2 nohup python main_ce.py --dataset city_classification_original --data_folder ./datasets/city_classification/Original/train/ --test_folder ./datasets/city_classification/Original/val/ --aug resizedCrop horizontalFlip colorJitter grayscale --num_classes 11 --learning_rate 0.125 --cosine --model resnet18 --epochs 500 --size 300 --batch_size 26 --batch_size_val 26 --mean "(0.1667, 0.1889, 0.1641)" --std "(0.1941, 0.2075, 0.1908)" --tag cityOrigAllAug > supCE_cityOrigAllAug.out &
+```
+
 ## Cross Entropy Learning with city_classification_diff
 
 Training:
@@ -138,6 +145,21 @@ CUDA_VISIBLE_DEVICES=2 nohup python main_ce.py --dataset city_classification_dif
 ```
 
 <!-- -------------------------------------------------------------------------------------------------------------------------------------- -->
+## Cross Entropy Learning with city_classification_diff with all augmentations
+
+Training:
+```
+CUDA_VISIBLE_DEVICES=2 nohup python main_ce.py --dataset city_classification_diff --data_folder ./datasets/city_classification/EEDv2_5792_as_Original5/train/ --test_folder ./datasets/city_classification/EEDv2_5792_as_Original5/val/ --aug resizedCrop horizontalFlip colorJitter grayscale --num_classes 11 --learning_rate 0.125 --cosine --model resnet18 --epochs 500 --size 300 --batch_size 26 --batch_size_val 26 --mean "(0.1471, 0.1704, 0.1445)" --std "(0.1896, 0.2021, 0.1862)" --tag cityDiffAllAug > supCE_cityDiffAllAug.out &
+```
+
+## Cross Entropy Learning with city_classification_original+diff use diffused images as augmentation and also all kinds of augmentations
+
+Training:
+```
+CUDA_VISIBLE_DEVICES=2 nohup python main_ce.py --dataset city_classification_original+diff --data_folder ./datasets/city_classification/Original/train/ --diff_folder ./datasets/city_classification/EEDv2_5792_as_Original5/train/ --test_folder ./datasets/city_classification/Original/val/ --aug resizedCrop horizontalFlip colorJitter grayscale --num_classes 11 --learning_rate 0.125 --cosine --model resnet18 --epochs 500 --size 300 --batch_size 26 --batch_size_val 26 --mean "(0.1667, 0.1889, 0.1641)" --std "(0.1941, 0.2075, 0.1908)" --tag cityDiffAugAllAug > supCE_cityDiffAugAllAug.out &
+```
+<!-- -------------------------------------------------------------------------------------------------------------------------------------- -->
+
 ## Supervised Contrastive Learning with city_classification_original
 
 Training:
@@ -149,6 +171,5 @@ CUDA_VISIBLE_DEVICES=2 nohup python main_supcon.py --dataset city_classification
 
 Training:
 ```
-CUDA_VISIBLE_DEVICES=1 nohup python main_supcon.py --dataset city_classification_original+diff --data_folder ./datasets/city_classification/Original/train/ --diff_folder ./datasets/city_classification/EEDv2_5792_as_Original5/train/ --aug sameResizedCrop sameHorizontalFlip colorJitter grayscale --learning_rate 0.125 --temp 0.1 --cosine --model resnet18 --epochs 300 --size 300 --batch_size 26 --method SupCon --mean "(0.1667, 0.1889, 0.1641)" --std "(0.1941, 0.2075, 0.1908)" --tag cityCAugSameSAug > supCon_cityCAugSameSAug.out &
+CUDA_VISIBLE_DEVICES=2 nohup python main_supcon.py --dataset city_classification_original+diff --data_folder ./datasets/city_classification/Original/train/ --diff_folder ./datasets/city_classification/EEDv2_5792_as_Original5/train/ --aug sameResizedCrop sameHorizontalFlip colorJitter grayscale --learning_rate 0.125 --temp 0.1 --cosine --model resnet18 --epochs 300 --size 300 --batch_size 26 --method SupCon --mean "(0.1667, 0.1889, 0.1641)" --std "(0.1941, 0.2075, 0.1908)" --tag cityCAugSameSAug > supCon_cityCAugSameSAug.out &
 ```
-<!-- -------------------------------------------------------------------------------------------------------------------------------------- -->
