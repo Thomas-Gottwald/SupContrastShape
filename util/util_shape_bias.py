@@ -533,23 +533,32 @@ def load_compute_orig_diff_embeddings(root_model, dataset_orig, dataset_diff, cu
             embedding_orig = embedding_orig[np.argsort(images_orig)]
             class_labels = class_labels[np.argsort(images_orig)]
 
-        with open(os.path.join(path_embeddings_diff, "embedding_test"), 'rb') as f:
-            entry = pickle.load(f, encoding='latin1')
-            embedding_diff = entry['data']
+        if os.path.isfile(os.path.join(path_embeddings_diff, "embedding_test")):
+            with open(os.path.join(path_embeddings_diff, "embedding_test"), 'rb') as f:
+                entry = pickle.load(f, encoding='latin1')
+                embedding_diff = entry['data']
 
-             # load the image names (or compute and store them for the future)
-            if "images" in entry:
-                images_diff = entry["images"]
-            else:
-                print(f"{dataset_diff}: Image names not found in precomputed embeddings! Recompute them and store them wich image names!")
-                root_dataset_train_diff, root_dataset_test_diff = ut_val.get_root_dataset(dataset=dataset_diff)
+                # load the image names (or compute and store them for the future)
+                if "images" in entry:
+                    images_diff = entry["images"]
+                else:
+                    print(f"{dataset_diff}: Image names not found in precomputed embeddings! Recompute them and store them wich image names!")
+                    root_dataset_train_diff, root_dataset_test_diff = ut_val.get_root_dataset(dataset=dataset_diff)
 
-                train_loader, val_loader = ut_val.set_dataloader(dataset_diff, params, root_dataset_train_diff, root_dataset_test_diff)
-                model = ut_val.set_model(root_model, params, cuda_device)
+                    train_loader, val_loader = ut_val.set_dataloader(dataset_diff, params, root_dataset_train_diff, root_dataset_test_diff)
+                    model = ut_val.set_model(root_model, params, cuda_device)
 
-                _, _, _, embedding_diff, _, images_diff = ut_val.compute_and_save_embeddings(model, train_loader, val_loader, path_embeddings_diff, params, cuda_device)
-            # use image names to sort the feature embeddings so that they match up with the other embeddings
-            embedding_diff = embedding_diff[np.argsort(images_diff)]
+                    _, _, _, embedding_diff, _, images_diff = ut_val.compute_and_save_embeddings(model, train_loader, val_loader, path_embeddings_diff, params, cuda_device)
+        else:
+            root_dataset_train_diff, root_dataset_test_diff = ut_val.get_root_dataset(dataset=dataset_diff)
+
+            _, val_loader = ut_val.set_dataloader(dataset_diff, params, root_dataset_train_diff, root_dataset_test_diff)
+            model = ut_val.set_model(root_model, params, cuda_device)
+
+            embedding_diff, _ = ut_val.compute_embedding(model, val_loader, params, cuda_device)
+            images_diff = [img[0].replace(val_loader.dataset.root, '') for img in val_loader.dataset.imgs]
+        # use image names to sort the feature embeddings so that they match up with the other embeddings
+        embedding_diff = embedding_diff[np.argsort(images_diff)]
 
     return embedding_orig, embedding_diff, class_labels
 

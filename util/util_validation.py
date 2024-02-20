@@ -69,15 +69,20 @@ def get_root_dataset(dataset):
         root_test = "./datasets/adaIN/shape_texture_conflict_animals10_many/"
     elif dataset == "stylized_animals10":
         root_train = None
-        root_test = "./datasets/adaIN/stylized_animals10/test/"
+        root_test = "./datasets/adaIN/stylized_animals10_304x304/test/"
     elif dataset == "stylized_city_classification":
         root_train = None
         root_test = "./datasets/adaIN/stylized_city_classification/test/"
     elif dataset in ["animals10_diff_-1PatchSize30",  "animals10_diff_-1PatchSize30CJitter",
                     "animals10_diff_-1InnerPatchSize30",  "animals10_diff_-1InnerPatchSize30CJitter",
-                     "animals10_diff_-1PixelShuffled"]:
+                     "animals10_diff_-1PixelShuffled", "animals10_diff_-1InnerPixelShuffled"]:
         root_train = None
         root_test = "./datasets/animals10_diff/-1/test/"
+    elif dataset in ["city_classification_originalPatchSize30", "city_classification_originalPatchSize30CJitter",
+                     "city_classification_originalInnerPatchSize30", "city_classification_originalInnerPatchSize30CJitter",
+                     "city_classification_originalPixelShuffled", "city_classification_originalInnerPixelShuffled"]:
+        root_train = None
+        root_test = "./datasets/city_classification/Original/val/"
     else:
         root_train = None
         root_test = None
@@ -87,16 +92,18 @@ def get_root_dataset(dataset):
 def get_dataset_augmentations(dataset):
     aug_dict = None
 
-    if dataset == "animals10_diff_-1PatchSize30":
+    if dataset in ["animals10_diff_-1PatchSize30", "city_classification_originalPatchSize30"]:
         aug_dict = {"aug": ["shufflePatches"], "shufflePatches": 30}
-    elif dataset == "animals10_diff_-1PatchSize30CJitter":
+    elif dataset in ["animals10_diff_-1PatchSize30CJitter", "city_classification_originalPatchSize30CJitter"]:
         aug_dict = {"aug": ["colorJitter", "shufflePatches"], "shufflePatches": 30, "colorJitter": [1.0, 0.4, 0.4, 0.4, 0.4]}
-    elif dataset == "animals10_diff_-1InnerPatchSize30":
+    elif dataset in ["animals10_diff_-1InnerPatchSize30", "city_classification_originalInnerPatchSize30"]:
         aug_dict = {"aug": ["shuffleInnerPatches"], "shufflePatches": 30}
-    elif dataset == "animals10_diff_-1InnerPatchSize30CJitter":
+    elif dataset in ["animals10_diff_-1InnerPatchSize30CJitter", "city_classification_originalInnerPatchSize30CJitter"]:
         aug_dict = {"aug": ["colorJitter", "shuffleInnerPatches"], "shufflePatches": 30, "colorJitter": [1.0, 0.4, 0.4, 0.4, 0.4]}
-    elif dataset == "animals10_diff_-1PixelShuffled":
+    elif dataset in ["animals10_diff_-1PixelShuffled", "city_classification_originalPixelShuffled"]:
         aug_dict = {"aug": ["shufflePatches"], "shufflePatches": 1}
+    elif dataset in ["animals10_diff_-1InnerPixelShuffled", "city_classification_originalInnerPixelShuffled"]:
+        aug_dict = {"aug": ["shuffleInnerPatches"], "shufflePatches": 1}
 
     return aug_dict
 
