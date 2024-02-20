@@ -15,7 +15,7 @@ from util.util import AverageMeter
 from util.util import adjust_learning_rate, warmup_learning_rate, accuracy
 from util.util import set_optimizer, save_model
 from networks.resnet_big import SupCEResNet
-from util.util_diff import DiffLoader, SelectTransform
+from util.util_diff import set_RelatedLoader, SelectTransform
 from util.util_logging import create_csv_file_training, create_run_md, create_crossentropy_plots
 
 
@@ -215,8 +215,9 @@ def set_loader(opt):
                                         transform=val_transform)
     else:
         if opt.diff_folder:
+            relatedLoader = set_RelatedLoader(path_orig=opt.data_folder, path_related=opt.diff_folder)
             train_dataset = datasets.ImageFolder(root=opt.data_folder,
-                                                 loader=DiffLoader(path_orig=opt.data_folder, path_diff=opt.diff_folder),
+                                                 loader=relatedLoader,
                                                  transform=train_transform)
         else:
             train_dataset = datasets.ImageFolder(root=opt.data_folder,

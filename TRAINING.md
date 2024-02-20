@@ -114,6 +114,25 @@ Training:
 CUDA_VISIBLE_DEVICES=1 nohup python main_ce.py --dataset animals10_diff_-1+8000 --data_folder ./datasets/animals10_diff/-1/train/ --diff_folder ./datasets/animals10_diff/8000/train/ --test_folder ./datasets/animals10_diff/-1/test/ --aug resizedCrop horizontalFlip colorJitter grayscale --num_classes 10 --learning_rate 0.125 --cosine --model resnet18 --epochs 500 --size 300 --batch_size 26 --batch_size_val 26 --mean "(0.3816, 0.3683, 0.3052)" --std "(0.3281, 0.3198, 0.3055)" --tag diffAugAllAug > supCE_diffAugAllAug.out &
 ```
 
+<!-- -------------------------------------------------------------------------------------------------------------------------------------- -->
+### animals10_diff_stylized
+
+**Resnet18, batchsize: 26, learning rate: 0.125, epochs: 500 stylized images with all augmentations**
+
+Training:
+```
+CUDA_VISIBLE_DEVICES=2 nohup python main_ce.py --dataset animals10_diff_stylized --data_folder ./datasets/adaIN/animals10_diff_stylized/train/ --test_folder ./datasets/adaIN/animals10_diff_stylized/test/ --aug resizedCrop horizontalFlip colorJitter grayscale --num_classes 10 --learning_rate 0.125 --cosine --model resnet18 --epochs 500 --size 300 --batch_size 26 --batch_size_val 26 --mean "(0.5643, 0.5126, 0.4516)" --std "(0.2696, 0.2618, 0.2596)" --tag stylizedAllAug > supCE_stylizedAllAug.out &
+```
+
+**Resnet18, batchsize: 26, learning rate: 0.125, epochs: 500, use stylized images as augmentation and also all kinds of augmentations**
+
+Training:
+```
+CUDA_VISIBLE_DEVICES=2 nohup python main_ce.py --dataset animals10_diff_-1+stylized --data_folder ./datasets/animals10_diff/-1/train/ --diff_folder ./datasets/adaIN/animals10_diff_stylized/train/ --test_folder ./datasets/animals10_diff/-1/test/ --aug resizedCrop horizontalFlip colorJitter grayscale --num_classes 10 --learning_rate 0.125 --cosine --model resnet18 --epochs 500 --size 300 --batch_size 26 --batch_size_val 26 --mean "(0.3816, 0.3683, 0.3052)" --std "(0.3281, 0.3198, 0.3055)" --tag stylizedAugAllAug > supCE_stylizedAugAllAug.out &
+```
+
+<!-- -------------------------------------------------------------------------------------------------------------------------------------- -->
+
 ## No Training Baseline
 
 "Training":

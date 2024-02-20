@@ -1,3 +1,5 @@
+import os
+import glob
 import torch
 import torch.nn.functional as nnf
 from torchvision import transforms, datasets
@@ -106,6 +108,43 @@ class DiffLoader:
 
     def __call__(self, path:str):
         return [self.loader(path), self.loader(path.replace(self.path_orig, self.path_diff))]
+    
+
+class StylizedLoader:
+    """Loads two images one from path the other from the same path where path_orig is replaced by path_stylized and the image name has appendix '_stylized_*'"""
+    def __init__(self, path_orig:str, path_stylized:str, loader=datasets.folder.default_loader):
+        self.path_orig = path_orig
+        self.path_stylized = path_stylized
+        self.loader = loader
+
+    def __call__(self, path:str):
+        stylized_path = glob.glob(os.path.join(os.path.dirname(path).replace(self.path_orig, self.path_stylized), os.path.split(path)[-1].split(".")[0] + "_stylized_*"))[0]
+        return [self.loader(path), self.loader(stylized_path)]
+    
+
+def set_RelatedLoader(path_orig, path_related, loader=datasets.folder.default_loader):
+    """
+    Checks the given paths to image datasets and returns a dataLoader that loads related images from both paths simultaneously.
+
+    Supported are save structures, where the related images have the same name including datatype
+    and where the related images have an appendix "_stylized_*" (*: can be arbitrary continuation)
+    """
+    imgs_orig = [os.path.join(*p.split('/')[-2:]) for p in sorted(glob.glob(os.path.join(path_orig, "*", "*")))]
+    imgs_related = [os.path.join(*p.split('/')[-2:]) for p in sorted(glob.glob(os.path.join(path_related, "*", "*")))]
+
+    if imgs_orig == imgs_related:
+        # if related images have the same name
+        return DiffLoader(path_orig=path_orig, path_diff=path_related, loader=loader)
+    else:
+        # if related images have an appendix of the form "_stylized_*"
+        imgs_orig = sorted([img.split(".")[0] for img in imgs_orig])
+        imgs_related = sorted([img.split("_stylized_")[0] for img in imgs_related])
+
+        if imgs_orig == imgs_related:
+            return StylizedLoader(path_orig=path_orig, path_stylized=path_related, loader=loader)
+    
+    # return None if no relation was found!
+    return None
     
 
 class ShufflePatches:
