@@ -61,18 +61,27 @@ def get_root_dataset(dataset):
     elif dataset == "city_classification_diff":
         root_train = "./datasets/city_classification/EEDv2_5792_as_Original5/train/"
         root_test = "./datasets/city_classification/EEDv2_5792_as_Original5/val/"
-    elif dataset == "shape_texture_conflict_animals10_two":
+    elif dataset == "shape_texture_conflict_animals10_two_304x304":
         root_train = None
-        root_test = "./datasets/adaIN/shape_texture_conflict_animals10_two/"
+        root_test = "./datasets/adaIN/shape_texture_conflict_animals10_two_304x304/"
     elif dataset == "shape_texture_conflict_animals10_many":
         root_train = None
         root_test = "./datasets/adaIN/shape_texture_conflict_animals10_many/"
-    elif dataset == "stylized_animals10":
+    elif dataset == "shape_texture_conflict_animals10_many_304x304":
+        root_train = None
+        root_test = "./datasets/adaIN/shape_texture_conflict_animals10_many_304x304/"
+    elif dataset == "animals10_diff_stylized":
+        root_train = "./datasets/adaIN/animals10_diff_stylized/train/"
+        root_test = "./datasets/adaIN/animals10_diff_stylized/test/"
+    elif dataset == "stylized_animals10_304x304":
         root_train = None
         root_test = "./datasets/adaIN/stylized_animals10_304x304/test/"
     elif dataset == "stylized_city_classification":
         root_train = None
         root_test = "./datasets/adaIN/stylized_city_classification/test/"
+    elif dataset == "stylized_city_classification_304x304":
+        root_train = None
+        root_test = "./datasets/adaIN/stylized_city_classification_304x304/test/"
     elif dataset in ["animals10_diff_-1PatchSize30",  "animals10_diff_-1PatchSize30CJitter",
                     "animals10_diff_-1InnerPatchSize30",  "animals10_diff_-1InnerPatchSize30CJitter",
                      "animals10_diff_-1PixelShuffled", "animals10_diff_-1InnerPixelShuffled"]:
