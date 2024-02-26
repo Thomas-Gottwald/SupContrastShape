@@ -564,12 +564,12 @@ def create_shape_bias_md(path_folder):
         lines_datasets = dict()
         for dset in cue_conf_datasets:
             sb_paths = glob.glob(os.path.join(path_folder, f"val_{e}", "shapeBiasMetrics", "CueConflict", dset, "shape_bias.csv"))
+            lines_datasets[dset] = []
 
             if len(sb_paths) == 1:
                 df_bias = pd.read_csv(sb_paths[0], index_col=0)
                 list_df_bias.append(df_bias)
 
-                lines_datasets[dset] = []
                 class_sb_paths = glob.glob(os.path.join(path_folder, f"val_{e}", "shapeBiasMetrics", "CueConflict", dset, "classes_shape_bias.csv"))
                 if len(class_sb_paths) == 1:
                     df_class_bias = pd.read_csv(class_sb_paths[0], index_col=0).reset_index(names="metrics")

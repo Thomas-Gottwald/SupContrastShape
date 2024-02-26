@@ -128,7 +128,7 @@ CUDA_VISIBLE_DEVICES=2 nohup python main_ce.py --dataset animals10_diff_stylized
 
 Training:
 ```
-CUDA_VISIBLE_DEVICES=2 nohup python main_ce.py --dataset animals10_diff_-1+stylized --data_folder ./datasets/animals10_diff/-1/train/ --diff_folder ./datasets/adaIN/animals10_diff_stylized/train/ --test_folder ./datasets/animals10_diff/-1/test/ --aug resizedCrop horizontalFlip colorJitter grayscale --num_classes 10 --learning_rate 0.125 --cosine --model resnet18 --epochs 500 --size 300 --batch_size 26 --batch_size_val 26 --mean "(0.3816, 0.3683, 0.3052)" --std "(0.3281, 0.3198, 0.3055)" --tag stylizedAugAllAug > supCE_stylizedAugAllAug.out &
+CUDA_VISIBLE_DEVICES=1 nohup python main_ce.py --dataset animals10_diff_-1+stylized --data_folder ./datasets/animals10_diff/-1/train/ --diff_folder ./datasets/adaIN/animals10_diff_stylized/train/ --test_folder ./datasets/animals10_diff/-1/test/ --aug resizedCrop horizontalFlip colorJitter grayscale --num_classes 10 --learning_rate 0.125 --cosine --model resnet18 --epochs 500 --size 300 --batch_size 26 --batch_size_val 26 --mean "(0.3816, 0.3683, 0.3052)" --std "(0.3281, 0.3198, 0.3055)" --tag stylizedAugAllAug > supCE_stylizedAugAllAug.out &
 ```
 
 <!-- -------------------------------------------------------------------------------------------------------------------------------------- -->
@@ -163,14 +163,14 @@ Training:
 CUDA_VISIBLE_DEVICES=2 nohup python main_ce.py --dataset city_classification_diff --data_folder ./datasets/city_classification/EEDv2_5792_as_Original5/train/ --test_folder ./datasets/city_classification/EEDv2_5792_as_Original5/val/ --num_classes 11 --learning_rate 0.125 --cosine --model resnet18 --epochs 500 --size 300 --batch_size 26 --batch_size_val 26 --mean "(0.1471, 0.1704, 0.1445)" --std "(0.1896, 0.2021, 0.1862)" --tag cityDiff > supCE_cityDiff.out &
 ```
 
-<!-- -------------------------------------------------------------------------------------------------------------------------------------- -->
+
 ## Cross Entropy Learning with city_classification_diff with all augmentations
 
 Training:
 ```
 CUDA_VISIBLE_DEVICES=2 nohup python main_ce.py --dataset city_classification_diff --data_folder ./datasets/city_classification/EEDv2_5792_as_Original5/train/ --test_folder ./datasets/city_classification/EEDv2_5792_as_Original5/val/ --aug resizedCrop horizontalFlip colorJitter grayscale --num_classes 11 --learning_rate 0.125 --cosine --model resnet18 --epochs 500 --size 300 --batch_size 26 --batch_size_val 26 --mean "(0.1471, 0.1704, 0.1445)" --std "(0.1896, 0.2021, 0.1862)" --tag cityDiffAllAug > supCE_cityDiffAllAug.out &
 ```
-
+<!-- -------------------------------------------------------------------------------------------------------------------------------------- -->
 ## Cross Entropy Learning with city_classification_original+diff use diffused images as augmentation and also all kinds of augmentations
 
 Training:
