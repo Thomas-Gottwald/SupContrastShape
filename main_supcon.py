@@ -16,7 +16,7 @@ from util.util import adjust_learning_rate, warmup_learning_rate
 from util.util import set_optimizer, save_model
 from networks.resnet_big import SupConResNet
 from losses import SupConLoss
-from util.util_diff import DiffLoader, DiffTransform
+from util.util_diff import set_RelatedLoader, DiffTransform
 from util.util_diff import SameTwoRandomResizedCrop, SameTwoColorJitter, SameTwoApply
 from util.util_logging import create_csv_file_training, create_run_md, create_training_plots
 
@@ -227,8 +227,9 @@ def set_loader(opt):
     train_transform = transforms.Compose(transform_list)
 
     if opt.diff_folder:
+        relatedLoader = set_RelatedLoader(path_orig=opt.data_folder, path_related=opt.diff_folder)
         train_dataset = datasets.ImageFolder(root=opt.data_folder,
-                                            loader=DiffLoader(path_orig=opt.data_folder, path_diff=opt.diff_folder),
+                                            loader=relatedLoader,
                                             transform=DiffTransform(train_transform, train_same_transform))
     else:
         if opt.dataset == 'cifar10':
