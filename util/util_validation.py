@@ -76,6 +76,9 @@ def get_root_dataset(dataset):
     elif dataset == "stylized_animals10_304x304":
         root_train = None
         root_test = "./datasets/adaIN/stylized_animals10_304x304/test/"
+    elif dataset == "animals10_diff_adaINtexture":
+        root_train = "./datasets/adaIN/animals10_diff_adaINtexture/train/"
+        root_test = "./datasets/adaIN/animals10_diff_adaINtexture/test/"
     elif dataset == "stylized_city_classification":
         root_train = None
         root_test = "./datasets/adaIN/stylized_city_classification/test/"
