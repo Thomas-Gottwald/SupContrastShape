@@ -27,7 +27,7 @@ Contrastive training:
 CUDA_VISIBLE_DEVICES=2 nohup python main_supcon.py --dataset animals10_diff_-1+4000 --data_folder ./datasets/animals10_diff/-1/train/ --diff_folder ./datasets/animals10_diff/4000/train/ --aug sameResizedCrop sameHorizontalFlip colorJitter grayscale --learning_rate 0.02 --temp 0.1 --cosine --model resnet18 --epochs 100 --size 300 --batch_size 26 --method SupCon --related_factor 5.0 --mean "(0.3816, 0.3683, 0.3052)" --std "(0.3281, 0.3198, 0.3055)" --ckpt ./save/SupCon/animals10_diff_-1+4000/SupCon_animals10_diff_-1+4000_resnet18_lr_0.125_decay_0.0001_bsz_26_temp_0.1_trial_0_colorAugSameShapeAug_cosine/models/last.pth --save_freq 25 --tag fineTuneCAsameSAFactor5 > supCon_fineTuneCAsameSAFactor5.out &
 ```
 
-<!-- -------------------------------------------------------------------------------------------------------------------------------------- -->
+
 **Resnet18, batchsize: 26, learning rate: 0.02, epochs: 100, fine tuning from supCon_colorAugSameShapeAug with related factor 100**
 
 Contrastive training:
@@ -51,7 +51,7 @@ Contrastive training:
 ```
 CUDA_VISIBLE_DEVICES=2 nohup python main_supcon.py --dataset animals10_diff_-1+4000 --data_folder ./datasets/animals10_diff/-1/train/ --diff_folder ./datasets/animals10_diff/4000/train/ --aug sameResizedCrop sameHorizontalFlip colorJitter grayscale --learning_rate 0.02 --temp 0.1 --cosine --model resnet18 --epochs 100 --size 300 --batch_size 26 --method SupCon --related_factor 100.0 --mean "(0.3816, 0.3683, 0.3052)" --std "(0.3281, 0.3198, 0.3055)" --ckpt ./save/SupCon/animals10_diff_-1+4000/SupCon_animals10_diff_-1+4000_resnet18_lr_0.125_decay_0.0001_bsz_26_temp_0.1_trial_0_colorAugSameShapeAug_cosine/models/last.pth --save_freq 25 --tag fineTuneCAsameSAFactor100NoNormalize > supCon_fineTuneCAsameSAFactor100NoNormalize.out &
 ```
-<!-- -------------------------------------------------------------------------------------------------------------------------------------- -->
+
 
 ### animals10_diff_8000
 
@@ -92,7 +92,23 @@ Contrastive training:
 CUDA_VISIBLE_DEVICES=0 nohup python main_supcon.py --dataset animals10_diff_-1+stylized --data_folder ./datasets/animals10_diff/-1/train/ --diff_folder ./datasets/adaIN/animals10_diff_stylized/train/ --aug sameResizedCrop sameHorizontalFlip colorJitter grayscale --learning_rate 0.0156 --temp 0.1 --cosine --model resnet18 --epochs 300 --size 300 --batch_size 26 --method SupCon --mean "(0.3816, 0.3683, 0.3052)" --std "(0.3281, 0.3198, 0.3055)" --tag stylizedCAugSameSAug_try6 > supCon_stylizedCAugSameSAug_try6.out &
 ```
 
-<!-- -------------------------------------------------------------------------------------------------------------------------------------- -->
+<!-- --------------------------------------------------------------------------------------------------------------------------- -->
+**Resnet18, batchsize: 26, learning rate: 0.0312, epochs: 300, Factor 5, colorJitter, grayscale, sameResizedCrop and sameHorizontalFlip Augmentations**
+
+Contrastive training:
+```
+CUDA_VISIBLE_DEVICES=1 nohup python main_supcon.py --dataset animals10_diff_-1+stylized --data_folder ./datasets/animals10_diff/-1/train/ --diff_folder ./datasets/adaIN/animals10_diff_stylized/train/ --aug sameResizedCrop sameHorizontalFlip colorJitter grayscale --learning_rate 0.0312 --temp 0.1 --cosine --model resnet18 --epochs 300 --size 300 --batch_size 26 --method SupCon --related_factor 5.0 --mean "(0.3816, 0.3683, 0.3052)" --std "(0.3281, 0.3198, 0.3055)" --tag stylizedCAugSameSAugFactor5_lr0.0312 > supCon_stylizedCAugSameSAugFactor5.out &
+```
+
+**Resnet18, batchsize: 26, learning rate: 0.0312, epochs: 300, Factor 20, colorJitter, grayscale, sameResizedCrop and sameHorizontalFlip Augmentations**
+
+Contrastive training:
+```
+CUDA_VISIBLE_DEVICES=2 nohup python main_supcon.py --dataset animals10_diff_-1+stylized --data_folder ./datasets/animals10_diff/-1/train/ --diff_folder ./datasets/adaIN/animals10_diff_stylized/train/ --aug sameResizedCrop sameHorizontalFlip colorJitter grayscale --learning_rate 0.0312 --temp 0.1 --cosine --model resnet18 --epochs 300 --size 300 --batch_size 26 --method SupCon --related_factor 20.0 --mean "(0.3816, 0.3683, 0.3052)" --std "(0.3281, 0.3198, 0.3055)" --tag stylizedCAugSameSAugFactor20_lr0.0312 > supCon_stylizedCAugSameSAugFactor20.out &
+```
+<!-- --------------------------------------------------------------------------------------------------------------------------- -->
+
+
 ### animals10_diff_adaINtexture
 
 **Resnet18, batchsize: 26, learning rate: 0.0156, epochs: 300, colorJitter, grayscale, sameResizedCrop and sameHorizontalFlip Augmentations**
@@ -102,7 +118,6 @@ Contrastive training:
 CUDA_VISIBLE_DEVICES=0 nohup python main_supcon.py --dataset animals10_diff_-1+adaINtexture --data_folder ./datasets/animals10_diff/-1/train/ --diff_folder ./datasets/adaIN/animals10_diff_adaINtexture/train/ --aug sameResizedCrop sameHorizontalFlip colorJitter grayscale --learning_rate 0.0156 --temp 0.1 --cosine --model resnet18 --epochs 300 --size 300 --batch_size 26 --method SupCon --mean "(0.3816, 0.3683, 0.3052)" --std "(0.3281, 0.3198, 0.3055)" --tag adaINtextureCAugSameSAug > supCon_adaINtextureCAugSameSAug.out &
 ```
 
-<!-- -------------------------------------------------------------------------------------------------------------------------------------- -->
 
 ## Supervised Contrastive Learning with Factor with animals10_diff
 
@@ -171,7 +186,8 @@ Training:
 ```
 CUDA_VISIBLE_DEVICES=1 nohup python main_ce.py --dataset animals10_diff_-1+stylized --data_folder ./datasets/animals10_diff/-1/train/ --diff_folder ./datasets/adaIN/animals10_diff_stylized/train/ --test_folder ./datasets/animals10_diff/-1/test/ --aug resizedCrop horizontalFlip colorJitter grayscale --num_classes 10 --learning_rate 0.125 --cosine --model resnet18 --epochs 500 --size 300 --batch_size 26 --batch_size_val 26 --mean "(0.3816, 0.3683, 0.3052)" --std "(0.3281, 0.3198, 0.3055)" --tag stylizedAugAllAug > supCE_stylizedAugAllAug.out &
 ```
-<!-- -------------------------------------------------------------------------------------------------------------------------------------- -->
+
+
 ### animals10_diff_adaINtexture
 
 **Resnet18, batchsize: 26, learning rate: 0.125, epochs: 500 adaIN texture-transfered images with all augmentations**
@@ -188,7 +204,6 @@ Training:
 CUDA_VISIBLE_DEVICES=2 nohup python main_ce.py --dataset animals10_diff_-1+adaINtexture --data_folder ./datasets/animals10_diff/-1/train/ --diff_folder ./datasets/adaIN/animals10_diff_adaINtexture/train/ --test_folder ./datasets/animals10_diff/-1/test/ --aug resizedCrop horizontalFlip colorJitter grayscale --num_classes 10 --learning_rate 0.125 --cosine --model resnet18 --epochs 500 --size 300 --batch_size 26 --batch_size_val 26 --mean "(0.3816, 0.3683, 0.3052)" --std "(0.3281, 0.3198, 0.3055)" --tag adaINtextureAugAllAug > supCE_adaINtextureAugAllAug.out &
 ```
 
-<!-- -------------------------------------------------------------------------------------------------------------------------------------- -->
 
 ## No Training Baseline
 
@@ -227,14 +242,14 @@ Training:
 ```
 CUDA_VISIBLE_DEVICES=2 nohup python main_ce.py --dataset city_classification_diff --data_folder ./datasets/city_classification/EEDv2_5792_as_Original5/train/ --test_folder ./datasets/city_classification/EEDv2_5792_as_Original5/val/ --aug resizedCrop horizontalFlip colorJitter grayscale --num_classes 11 --learning_rate 0.125 --cosine --model resnet18 --epochs 500 --size 300 --batch_size 26 --batch_size_val 26 --mean "(0.1471, 0.1704, 0.1445)" --std "(0.1896, 0.2021, 0.1862)" --tag cityDiffAllAug > supCE_cityDiffAllAug.out &
 ```
-<!-- -------------------------------------------------------------------------------------------------------------------------------------- -->
+
 ## Cross Entropy Learning with city_classification_original+diff use diffused images as augmentation and also all kinds of augmentations
 
 Training:
 ```
 CUDA_VISIBLE_DEVICES=1 nohup python main_ce.py --dataset city_classification_original+diff --data_folder ./datasets/city_classification/Original/train/ --diff_folder ./datasets/city_classification/EEDv2_5792_as_Original5/train/ --test_folder ./datasets/city_classification/Original/val/ --aug resizedCrop horizontalFlip colorJitter grayscale --num_classes 11 --learning_rate 0.125 --cosine --model resnet18 --epochs 500 --size 300 --batch_size 26 --batch_size_val 26 --mean "(0.1667, 0.1889, 0.1641)" --std "(0.1941, 0.2075, 0.1908)" --tag cityDiffAugAllAug > supCE_cityDiffAugAllAug.out &
 ```
-<!-- -------------------------------------------------------------------------------------------------------------------------------------- -->
+
 
 ## Supervised Contrastive Learning with city_classification_original
 

@@ -11,6 +11,9 @@ def parse_option():
     parser.add_argument('--path_second', type=str, default=None, help='path to a second pickeled feature embedding')
     parser.add_argument('--path_save', type=str, default=None, help='path to save the t-SNE embedding. If not given they will be saved at path.')
 
+    parser.add_argument('--metric', type=str, default='euclidean',
+                        choices=['euclidean', 'innerproduct'], help='choose metric')
+
     opt = parser.parse_args()
 
     return opt
@@ -21,6 +24,8 @@ def main():
     path = opt.path
     path_second = opt.path_second
     path_save = opt.path_save if opt.path_save else path
+
+    metric = opt.metric
 
     for split in ["train", "test"]:
         print(f"Data split {split}")
@@ -38,7 +43,7 @@ def main():
                     entry['labels'] = np.append(entry['labels'], entry_second['labels'])
 
             print("compute t-SNE embedding")
-            embedding_tSNE = tsnecuda.TSNE(n_components=2, perplexity=30, learning_rate=10).fit_transform(embedding)
+            embedding_tSNE = tsnecuda.TSNE(n_components=2, perplexity=30, learning_rate=10, metric=metric).fit_transform(embedding)
 
             print("writ t-SNE embedding")
             entry['data'] = embedding_tSNE
